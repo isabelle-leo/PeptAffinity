@@ -1,0 +1,1251 @@
+library(shiny)
+library(ggplot2)
+library(ComplexHeatmap)
+library(dplyr)
+library(curl)
+library(Biostrings)
+library(Rcpi)
+library(shinyjs)
+library(classInt)
+library(ggpubr)
+library(circlize)
+library(shinyWidgets)
+library(shinycssloaders)
+library(shinythemes)
+library(bslib)
+library(shinyBS)
+library(sysfonts)
+library(showtext)
+library(data.table)
+library(viridis)
+library(heatmaply)
+library(purrr)
+library(plotly)
+library(data.table)
+library(RColorBrewer)
+
+font_add_google("Open Sans", "open-sans")  
+showtext_auto()  # Enable showtext globally
+
+theme_minimal(base_family = "open-sans")
+
+plasma_data <- readRDS("data/plasma_data_FASTA_by_gene.RDS")
+plasma_dt <- as.data.table(plasma_data)
+setkey(plasma_dt, Gene.Name)
+
+get_color_vector <- function (colors,
+                              vec,
+                              gray = "#494e57") {
+  
+  n <- length(unique(vec))
+  
+  suppl_needed <- max(n - length(colors), 0)
+  col_suppl <- c(colors[1:min(n, length(colors))], rep(gray, suppl_needed))
+  
+  # count appearances of each group
+  vec_accum <- table(vec) %>% sort(decreasing = TRUE)
+  
+  names(col_suppl) <- names(vec_accum) %>% as.character()
+  
+  # add a gray missing value
+  col_suppl <- c(col_suppl, c("0" = gray))
+  
+  return(col_suppl)
+}
+
+get_alphafold_file <- function(ioi, uniprot_ids){
+  
+  uniprot_ids_options <- length(uniprot_ids[uniprot_ids$hgnc_symbol == ioi,]$uniprotswissprot)
+  request_num <- 1
+  
+  uniprot_ioi <- uniprot_ids[uniprot_ids$hgnc_symbol == ioi,]$uniprotswissprot[request_num]
+  #add the file type
+  alphafold_path <- paste0(tempfile(), ".pdb")
+  alphafold_file <- curl_fetch_disk(url = paste0("https://alphafold.ebi.ac.uk/files/AF-",uniprot_ioi,"-F1-model_v4.pdb"),
+                                    handle = new_handle(),
+                                    path = alphafold_path)
+  
+  while(request_num <= uniprot_ids_options & alphafold_file[["status_code"]] == 404){
+    request_num <-  request_num +1
+    uniprot_ioi <- uniprot_ids[uniprot_ids$hgnc_symbol == ioi,]$uniprotswissprot[request_num]
+    alphafold_file <- curl_fetch_disk(url = paste0("https://alphafold.ebi.ac.uk/files/AF-",uniprot_ioi,"-F1-model_v4.pdb"),
+                                      handle = new_handle(),
+                                      path = alphafold_path)
+  }
+  
+  return(alphafold_file)
+}
+
+get_FASTA_fromalphafold <- function(alphafold_file){
+  
+  uniprot_ioi <- gsub("https://alphafold.ebi.ac.uk/files/AF-", "", alphafold_file[["url"]])
+  uniprot_ioi <- gsub("-F1-model_v4.pdb", "", uniprot_ioi)
+  
+  #add the file type
+  FASTA_path <- paste0(tempfile(), ".fasta")
+  FASTA_file <- curl_fetch_disk(url = paste0('https://rest.uniprot.org/uniprotkb/', uniprot_ioi, '.fasta'),
+                                handle = new_handle(),
+                                path = FASTA_path)
+  
+  AASeq <- readFASTA(file = FASTA_file[["content"]])
+  fasta_seq <- toString(AASeq[[1]])
+  return(fasta_seq)
+  
+  unlink(FASTA_file)
+  
+  # while(request_num <= uniprot_ids_options & alphafold_file[["status_code"]] == 404){
+  #   request_num <-  request_num +1
+  #   uniprot_ioi <- uniprot_ids[uniprot_ids$hgnc_symbol == ioi,]$uniprot_gn_id[request_num]
+  #   alphafold_file <- curl_fetch_disk(url = paste0("https://alphafold.ebi.ac.uk/files/AF-",uniprot_ioi,"-F1-model_v4.pdb"),
+  #                                     handle = new_handle(),
+  #                                     path = alphafold_path)
+  # }
+  
+  #return(AASeq)
+}
+
+
+get_peptide_and_correlation_numeric <- function(fasta_list, peptide_seq_list, exclude = TRUE){
+  peptide_indices <- list()
+  for( i in 1:length(peptide_seq_list$peptides)){
+    peptide_indices[[rownames(peptide_seq_list[i,])]] <- data.frame(nchar(gsub(paste0(peptide_seq_list$peptides[i], ".*"), "", fasta_list)),
+                                                                    peptide_seq_list$peptide[i],
+                                                                    peptide_seq_list$N[i],
+                                                                    peptide_seq_list$target_correlation[i])
+    names(peptide_indices[[rownames(peptide_seq_list[i,])]]) <- c("start_position", "peptide", "N", "target_correlation")
+    
+    if(exclude == TRUE){
+      
+      if(peptide_indices[[rownames(peptide_seq_list[i,])]][1] == nchar(fasta_list)){
+        
+        peptide_indices[[rownames(peptide_seq_list[i,])]] <- NULL
+        
+      }
+      
+    }
+  }
+  
+  return(peptide_indices)
+}
+
+
+
+
+# Function to compute WCSS and BCSS
+compute_wcss_bcss <- function(data) {
+  total_mean <- mean(data$correlation, na.rm = TRUE)
+  
+  data_summarized <- data %>%
+    group_by(gene_symbol, cluster) %>%
+    summarise(
+      cluster_mean = mean(correlation, na.rm = TRUE),
+      WCSS = sum((correlation - cluster_mean)^2, na.rm = TRUE),
+      replicate_count = mean(replicate_count, na.rm = TRUE),
+      .groups = 'drop'
+    ) 
+  
+  data_summarized <- data_summarized %>%
+    group_by(gene_symbol) %>%
+    summarise(
+      WCSS = sum(WCSS, na.rm = TRUE),
+      BCSS = sum(replicate_count * (cluster_mean - total_mean)^2, na.rm = TRUE),
+      .groups = 'drop'
+    )
+  
+  return(data_summarized)
+}
+
+
+
+color_breaks <- seq(-1, 1, length.out = 100)
+#correlation_palette <- viridis(100, option = "D")  
+correlation_palette <- colorRampPalette(rev(brewer.pal(11, 'Spectral')))(100)
+
+
+compute_jenks_clusters_simple <- function(data, value_column = "correlation", n_classes = 3) {
+  data <- data %>%
+    group_by(gene_symbol) %>%
+    mutate(
+      jenks_class = classIntervals(
+        var = get(value_column),
+        n = n_classes,
+        style = "jenks"
+      )$classif %>%
+        cut(get(value_column), breaks = ., labels = c("Low", "Middle", "High"))
+    ) %>%
+    ungroup()
+  return(data)
+}
+
+
+
+compute_jenks_clusters <- function(data, value_column = "correlation", n_classes = 3) {
+  values <- data[[value_column]]
+  
+  # Ensure unique values for Jenks computation
+  values <- unique(values)
+  
+  # Compute Jenks breaks
+  breaks <- tryCatch(
+    {
+      if (length(values) > n_classes) {
+        classIntervals(values, n = n_classes, style = "jenks")$brks
+      } else {
+        stop("Insufficient unique values for Jenks")
+      }
+    },
+    error = function(e) {
+      # Fallback to quantile-based breaks
+      message("Fallback to quantile-based breaks")
+      quantile(values, probs = seq(0, 1, length.out = n_classes + 1))
+    }
+  )
+  
+  # Ensure breaks are unique
+  if (length(unique(breaks)) != length(breaks)) {
+    breaks <- seq(min(values), max(values), length.out = n_classes + 1)
+    message("Adjusted to evenly spaced breaks due to non-unique values")
+  }
+  
+  # Generate labels dynamically based on the number of breaks
+  labels <- c("Low", "Middle", "High")[1:(length(breaks) - 1)]
+  
+  # Assign classes based on the computed breaks
+  data <- data %>%
+    mutate(
+      jenks_class = cut(
+        .data[[value_column]],
+        breaks = breaks,
+        labels = labels,
+        include.lowest = TRUE
+      )
+    )
+  
+  return(data)
+}
+
+interpro_plot <- function(ioi, interpro_file, uniprot_ids, peptide_seq_list_file = NULL, fasta_file = NULL, abundance_file = NULL, abundance_column = "quant",
+                          correlation_palette = c("red", "gray", "blue"), 
+                          interpro_colors = c("#FF5376", "#72AFD9", "#E3D26F", "#A288E3", "#1B5299", "#68D8D6", "#B78DA3")) {
+  
+  interpro_ioi <- readRDS(interpro_file)
+  interpro_ioi <- interpro_ioi[interpro_ioi$hgnc_symbol == ioi & 
+                                 !is.null(interpro_ioi$interpro_description) & 
+                                 !is.na(interpro_ioi$interpro_description),]
+  
+  ioi_alphafold <- tryCatch({get_alphafold_file(ioi, uniprot_ids)},
+                            error = function(e){0})
+  
+  # if(!is.null(fasta_file)){
+  #   fasta_list <- readRDS(fasta_file)
+  #   fasta_list <- fasta_list[[which(names(fasta_list) %in% c(ioi, unique(uniprot_ids[uniprot_ids$hgnc_symbol == ioi,]$uniprotswissprot)))]][[1]] 
+  # } else {
+  #   # Get FASTA from alphafold
+  #   fasta_list <- get_FASTA_fromalphafold(ioi_alphafold)
+  # }
+  
+  # Get fasta seq from plasma_data_FASTA_by_gene.RDS (pass as fasta_file)
+  fasta_list <- unique(fasta_file$fasta[fasta_file$Gene.Name == ioi])
+  
+  peptide_seq_list <- readRDS(peptide_seq_list_file)
+  peptide_seq_list <- peptide_seq_list[[ioi]]
+  peptide_indices <- tryCatch({get_peptide_and_correlation_numeric(fasta_list, peptide_seq_list)},
+                              error = function(e){0})
+  
+  interpro_options <- unique(interpro_ioi$interpro_description)
+
+  # Initialize meta_hmap with two columns: Amino acid residue, Olink target correlation
+  meta_hmap <- matrix(nrow = nchar(fasta_list[[1]]), ncol = 2)
+  colnames(meta_hmap) <- c("Amino acid residue", "Olink target correlation")
+  meta_hmap[,'Amino acid residue'] <- as.numeric(1:nchar(fasta_list[[1]]))
+  
+  # Function to process peptides and handle overlaps (as before)
+  process_peptides <- function(col) {
+    overlap_peptides <- list()
+    for (k in seq_along(peptide_indices)) {
+      start <- as.numeric(peptide_indices[[k]][["start_position"]])
+      end <- start + nchar(peptide_indices[[k]][["peptide"]]) - 1
+      added_to_overlap <- FALSE
+      
+      if(all(is.na(meta_hmap[start:end, col]))){
+        meta_hmap[start:end, col] <- rep(peptide_indices[[k]][["target_correlation"]], times = length(start:end))
+      } else {
+        added_to_overlap = TRUE
+      }
+      
+      if (added_to_overlap) {
+        overlap_peptides[[length(overlap_peptides) + 1]] <- peptide_indices[[k]]
+      }
+    }
+    return(list(overlap_peptides=overlap_peptides, meta_hmap=meta_hmap))
+  }
+  
+  # Manage overlaps, starting with the correlation column (2)
+  col <- 2
+  repeat {
+    result <- process_peptides(col)
+    current_overlaps <- result$overlap_peptides
+    meta_hmap <- result$meta_hmap
+    if (length(current_overlaps) == 0) {
+      break
+    }
+    peptide_indices <- current_overlaps
+    # If more overlaps remain, add another correlation column
+    col <- ncol(meta_hmap) + 1
+    meta_hmap <- cbind(meta_hmap, NA)
+    colnames(meta_hmap)[col] <- paste("Correlation", col - 2)
+  }
+  
+  meta_hmap <- as.data.frame(meta_hmap, stringsAsFactors = FALSE)
+  
+  # Add domain columns
+  for(domain in interpro_options) {
+    meta_hmap[, domain] <- NA
+  }
+  
+  # Assign domain annotations
+  for(i in meta_hmap[,'Amino acid residue']) {
+    aa_idx <- which(meta_hmap[,'Amino acid residue'] == i)
+    for(j in seq_len(nrow(interpro_ioi))) {
+      if(i >= interpro_ioi$interpro_start[j] & i <= interpro_ioi$interpro_end[j]) {
+        dname <- interpro_ioi$interpro_description[j]
+        meta_hmap[aa_idx, dname] <- dname
+      }
+    }
+  }
+  
+  # We now have: 
+  # "Amino acid residue", "Olink target correlation", maybe more "Correlation X" columns, and domain columns.
+  
+  # Convert this to numeric
+  meta_hmap[,"Olink target correlation"] <- as.numeric(meta_hmap[,"Olink target correlation"])
+  
+  cor_data <- meta_hmap[,grepl("correlation", colnames(meta_hmap))|grepl("Correlation", colnames(meta_hmap)), drop=FALSE]
+  # Convert cor_data into a numeric matrix for heatmaply
+  cor_mat <- as.matrix(cor_data)
+  rownames(cor_mat) <- meta_hmap[,"Amino acid residue"]
+  
+  # Determine domain feature category per residue
+  domain_matrix <- meta_hmap[,interpro_options, drop=FALSE]
+  domains_per_res <- apply(domain_matrix, 1, function(x) sum(!is.na(x)))
+  
+  feature_category <- character(nrow(meta_hmap))
+  for (r in seq_len(nrow(meta_hmap))) {
+    n_doms <- domains_per_res[r]
+    if(n_doms == 0) {
+      feature_category[r] <- "No Feature"
+    } else if(n_doms == 1) {
+      # Extract the single non-NA domain
+      dom_name <- domain_matrix[r,][!is.na(domain_matrix[r,])]
+      feature_category[r] <- dom_name
+    } else {
+      feature_category[r] <- "Multiple Features"
+    }
+  }
+  
+  feature_category <- factor(feature_category, levels = c("No Feature", sort(setdiff(unique(feature_category), c("No Feature","Multiple Features"))), "Multiple Features"))
+  
+  # # Assign colors to domains consistently
+  # # Ensure we have enough colors
+  # all_categories <- levels(feature_category)
+  # n_cats <- length(all_categories)
+  # if(length(interpro_colors) < n_cats) {
+  #   interpro_colors <- colorRampPalette(interpro_colors)(n_cats)
+  # }
+  # cat_color_mapping <- setNames(interpro_colors[1:n_cats], all_categories)
+  # 
+  # Prepare hover text
+  # Hover: residue number, correlation, feature category
+  hover_text <- matrix(nrow = dim(cor_mat)[1], ncol = dim(cor_mat)[2])
+  
+  colnames(hover_text) <- colnames(cor_mat)
+  
+  for(j in colnames(cor_mat)){
+    
+    hover_text[,j] <- paste0("Residue: ", meta_hmap[,"Amino acid residue"],
+                             "<br>Correlation: ", round(cor_mat[,j], 3),
+                             "<br>Feature: ", feature_category)
+    
+  }
+  
+  # row_side_colors: we can provide a data frame with one column: feature_category
+  # heatmaply will display these as side colors.
+  row_side_colors_df <- data.frame(Feature = feature_category, stringsAsFactors = FALSE)
+  rownames(row_side_colors_df) <- rownames(cor_mat)
+  
+  # Create a continuous color scale for correlation from -1 to 1
+  # Use viridis or the given correlation_palette
+  # Already set scale -1 to 1:
+  color_breaks <- seq(-1, 1, length.out = 100)
+  correlation_palette <- colorRampPalette(correlation_palette)(100)
+  
+  #Substitute the domains for a "no feature" annotation instead of NA
+  domain_matrix<- domain_matrix %>%
+    #mutate(across(everything(), ~ ifelse(!is.na(.), "Feature", .))) %>%
+    mutate(across(everything(), ~ ifelse(is.na(.), "", .))) 
+  
+  # Define color palette for domains
+  domain_matrix_vec <- as.vector(as.matrix(domain_matrix))
+  all_categories <- factor(unique(as.vector(domain_matrix_vec)))
+  #cat_color_mapping <- setNames(interpro_colors[seq_along(all_categories)], all_categories)
+  domain_colors <- colorRampPalette(colors = brewer.pal(9, 'PuBuGn')[2:8])(length(all_categories))
+  
+  cat_color_mapping <- vector("list", length(all_categories))
+  names(cat_color_mapping) <- all_categories
+  for (i in seq_along(all_categories)) {
+    cat_color_mapping[[i]] <- domain_colors[i]
+    names(cat_color_mapping[[i]]) <- all_categories[i]
+  }
+  
+  
+  # Total plot height
+  domain_height <- (ncol(domain_matrix) + 1) * 30
+  peptide_height <- (ncol(cor_mat) + 1) * 40
+  total_height <- domain_height + peptide_height
+  # Proportional heights for subplots
+  domain_height <- domain_height / total_height
+  peptide_height <- peptide_height / total_height
+  
+  # Cap height at 600 px
+  total_height <- min(total_height, 600)
+  
+  # Min height of 300
+  total_height <- max(total_height, 400)
+  
+  heatmap <- heatmaply(
+    t(data.matrix(cor_mat)),
+    #main = paste("InterPro Domain & Correlation -", ioi),
+    scale = "none",
+    limits = c(-1,1),
+    showticklabels = c(TRUE, FALSE),
+    colors = correlation_palette,
+    ColSideColors = domain_matrix, 
+    colv = F,
+    Rowv = F,
+    plot_method ='plotly',
+    col_side_palette = colorRampPalette(brewer.pal(9, 'PuBuGn')[2:8]), # not working at the moment
+    hoverinfo = "text",
+    subplot_heights = c(domain_height, peptide_height),
+    height = total_height,
+    custom_hovertext = t(hover_text), # for hover
+    dendrogram = "none"
+    ) %>%
+    colorbar(
+      title = "MS-Olink correlation", 
+      titlefont = list(size = 10), 
+      tickfont = list(size = 8),
+      which = 2,
+      x = 1,
+      y = 0,
+      len = 100,
+      lenmode = 'pixels',
+      yanchor = 'bottom',
+      thickness = 15,
+      yref = 'paper'
+      )
+  
+  # Remove colorbar and legend for domain plot
+  heatmap$x$data[[1]]$showscale <- FALSE
+  
+  heatmap <- heatmap %>% 
+    layout(
+      xaxis = list(
+        title = 'Amino Acid Position',
+        titlefont = list(size = 10),
+        tickfont = list(size = 8),
+        tickvals = seq(100, nrow(cor_mat), by = 100),  # Set tick positions every 100
+        ticktext = seq(100, nrow(cor_mat), by = 100),   # Set corresponding labels
+        tickangle = 0
+        ),
+      yaxis = list(
+        titlefont = list(size = 10),
+        tickfont = list(size = 8),
+        side = 'right'
+        ),
+      yaxis2 = list(
+        title = 'MS Peptides',
+        titlefont = list(size = 10),
+        tickfont = list(size = 8)
+        )
+      )
+  
+  return(heatmap)
+  
+}
+# 
+# interpro_plot <- function(ioi, interpro_file, uniprot_ids, peptide_seq_list_file = NULL, fasta_file = NULL, abundance_file = NULL, abundance_column = "quant",
+#                           correlation_palette = c("red", "gray", "blue"), interpro_colors = c("#FF5376", "#72AFD9", "#E3D26F", "#A288E3", "#1B5299", "#68D8D6", "#B78DA3")){
+# 
+#   interpro_ioi <- readRDS(interpro_file)
+#   interpro_ioi <- interpro_ioi[interpro_ioi$hgnc_symbol == ioi & !is.null(interpro_ioi$interpro_description) & !is.na(interpro_ioi$interpro_description),]
+# 
+#   ioi_alphafold <- tryCatch({get_alphafold_file(ioi, uniprot_ids)},
+#                             error = function(e){0})
+# 
+#   if(!is.null(fasta_file)){fasta_list <- readRDS(fasta_file)
+# 
+#   fasta_list <- fasta_list[[which(names(fasta_list) %in% c(ioi, unique(uniprot_ids[uniprot_ids$hgnc_symbol == ioi,]$uniprotswissprot)))]][[1]]}else{
+#     #read a FASTA from uniprot
+#     #refer to alpha fold so FASTA is consistent
+#     fasta_list <- get_FASTA_fromalphafold(ioi_alphafold)
+# 
+#   }
+# 
+#   peptide_seq_list <- readRDS(peptide_seq_list_file)
+#   peptide_seq_list <- peptide_seq_list[[ioi]]
+#   peptide_indices <- tryCatch({get_peptide_and_correlation_numeric(fasta_list, peptide_seq_list)},
+#                               error = function(e){0})
+#   #retrieve from alphafold so it's consistent with the other visualizations in 3D
+# 
+#   interpro_options <- unique(interpro_ioi$interpro_description)
+# 
+# 
+#   meta_hmap <- matrix(nrow = nchar(fasta_list[[1]]), ncol = length(c("Amino acid residue", "Olink target correlation"#, interpro_options
+#   )))
+#   colnames(meta_hmap) <- c("Amino acid residue", "Olink target correlation"#, interpro_options
+#   )
+#   meta_hmap[,'Amino acid residue'] <- as.numeric(1:nchar(fasta_list[[1]]))
+# 
+# 
+#   # Function to process peptides and handle overlaps
+#   process_peptides <- function(col) {
+#     overlap_peptides <- list()
+# 
+#     for (k in seq_along(peptide_indices)) {
+#       start <- as.numeric(peptide_indices[[k]][["start_position"]])
+#       end <- start + nchar(peptide_indices[[k]][["peptide"]]) - 1
+#       added_to_overlap <- FALSE
+# 
+#       if(sum(!is.na(meta_hmap[start:end, col]))==0){
+#         meta_hmap[start:end, col] <- rep(peptide_indices[[k]][["target_correlation"]],times = length(start:end))
+#       } else {
+#         added_to_overlap = TRUE
+#       }
+# 
+#       if (added_to_overlap) {
+#         overlap_peptides[[length(overlap_peptides) + 1]] <- peptide_indices[[k]]
+#       }
+#     }
+# 
+#     return(list(overlap_peptides=overlap_peptides, meta_hmap=meta_hmap))
+# 
+#   }
+# 
+# 
+#   # Main loop to manage and resolve overlaps
+# 
+#   col = 2
+#   repeat {
+#     result <- process_peptides(col)
+#     current_overlaps <- result$overlap_peptides
+#     meta_hmap <- result$meta_hmap
+#     if (length(current_overlaps) == 0) {
+#       break  # Exit if no overlaps remain
+#     }
+#     # Prepare for the next round of overlaps
+#     peptide_indices <- current_overlaps
+#     col <- ncol(meta_hmap) + 1
+#     meta_hmap <- cbind(meta_hmap, NA)
+#     colnames(meta_hmap)[col] <- paste("Correlation", col)
+#   }
+# 
+#   meta_hmap <- as.data.frame(meta_hmap)
+#   colnames_corrrelation <- colnames(meta_hmap)[colnames(meta_hmap) != "Amino acid residue"]
+# 
+# 
+#   for(domain in interpro_ioi$interpro_description){
+#     meta_hmap[,domain] <- NA
+#   }
+#   for(i in as.numeric(meta_hmap[,'Amino acid residue'])){
+# 
+#     for(j in 1:nrow(interpro_ioi)){
+# 
+#       if(i >= interpro_ioi$interpro_start[j] & i <= interpro_ioi$interpro_end[j]){
+# 
+#         meta_hmap[meta_hmap[,'Amino acid residue'] == i,interpro_ioi$interpro_description[j]] <- interpro_ioi$interpro_description[j]
+# 
+#       }
+# 
+#     }
+#   }
+# 
+# 
+#   #make color for multi mapping
+# 
+#   # min_correlation <- min(meta_hmap[,'Olink target correlation'], na.rm = TRUE)
+#   # max_correlation <- max(meta_hmap[,'Olink target correlation'], na.rm = TRUE)
+#   # max_abs_correlation <- max(abs(min_correlation), abs(max_correlation))
+# 
+#   color_breaks <- seq(-1, 1, length.out = 100)
+#   correlation_palette <- colorRampPalette(correlation_palette)(length(color_breaks))
+#   color_mapping_function <- colorRamp2(color_breaks, correlation_palette)
+# 
+# 
+#   named_palette_list = setNames(rep(list(color_mapping_function), length(colnames_corrrelation)), colnames_corrrelation)
+# 
+# 
+#   #colors for each interpro option
+# 
+#   if (length(interpro_colors) < length(interpro_options)) {
+#     interpro_colors <- rep(interpro_colors, length.out = length(interpro_options))
+#   }
+# 
+#   domain_color_mapping <- setNames(interpro_colors, interpro_options)
+# 
+#   for (domain in interpro_options) {
+#     named_palette_list[[domain]] <- domain_color_mapping[domain]
+#   }
+# 
+# 
+#   #make it horizontal
+#   #meta_hmap <- as.data.frame(t(meta_hmap))
+# 
+#   #set legend things to hide
+#   legend_logical <- logical(length = length(colnames(meta_hmap)))
+#   legend_logical[1] <- TRUE
+#   legend_logical[2] <- TRUE
+# 
+#   if(length(colnames(meta_hmap)) >= 3){for (i in 3:length(colnames(meta_hmap))){
+# 
+#     legend_logical[i] <- FALSE
+# 
+#   }
+# 
+#     metadata_annotation_obj <- HeatmapAnnotation(df = meta_hmap, na_col = "white", col =   named_palette_list,
+#                                                  show_legend = legend_logical,
+#                                                  which = "col")
+# 
+#     plot(metadata_annotation_obj)
+#     return(metadata_annotation_obj)
+#   }
+# 
+# }
+# 
+
+
+jenks_density_plot <- function(ioi, peptide_seq_list_file, uniprot_ids, fasta_file = NULL) {
+  library(ggplot2)
+  library(dplyr)
+  
+  # Load peptide sequences for the gene of interest
+  peptide_seq_list <- readRDS(peptide_seq_list_file)
+  if (!ioi %in% names(peptide_seq_list)) {
+    stop("IOI not found in peptide_seq_list.")
+  }
+  
+  gene_peptides <- peptide_seq_list[[ioi]]
+  
+  # Get FASTA sequence
+  # if(!is.null(fasta_file)){
+  #   fasta_all <- readRDS(fasta_file)
+  #   # Extract relevant fasta; uniprot_ids should link gene_symbol to uniprot
+  #   relevant_uniprot <- unique(uniprot_ids[uniprot_ids$hgnc_symbol == ioi,]$uniprotswissprot)
+  #   relevant_uniprot <- relevant_uniprot[relevant_uniprot %in% names(fasta_all)]
+  #   if(length(relevant_uniprot) == 0) stop("No matching uniprot found for ioi in fasta_file.")
+  #   
+  #   # Use the first matching fasta sequence
+  #   fasta_seq <- fasta_all[[relevant_uniprot[1]]]
+  #   # Ensure fasta_seq is a character
+  #   fasta_seq <- as.character(fasta_seq)
+  # } else {
+  #   # If no fasta_file is given, try alphafold route (assuming get_alphafold_file and get_FASTA_fromalphafold defined)
+  #   ioi_alphafold <- get_alphafold_file(ioi, uniprot_ids)
+  #   fasta_seq <- get_FASTA_fromalphafold(ioi_alphafold)
+  #   fasta_seq <- as.character(fasta_seq[[1]])
+  # }
+  # 
+  
+  # Get FASTA sequence from plasma_data_FASTA_by_gene.RDS (pass in fasta_file)
+  fasta_seq <- unique(fasta_file$fasta[fasta_file$Gene.Name == ioi])
+  
+  jenks_df <- gene_peptides %>% 
+    mutate(peptide_id = row_number()) %>% 
+    mutate(jenks_class = cor_intervals(as.numeric(target_correlation)))
+  
+  # jenks_df now has a jenks_class column
+  # Now, we need to map each peptide to its amino acid positions
+  
+  # For each peptide, we find its start position in the sequence
+  # The start position is computed by removing the peptide and counting length
+  # The first occurrence of the peptide in fasta_seq gives start position
+  # But be aware of multiple occurrences. If multiple matches occur, handle accordingly!!!!! RECHECK THIS LOGIC
+  
+  # Assume the first occurrence is the correct one:
+  create_position_data <- function(peptide, jenks_class, fasta_seq, used_positions) {
+    # Find the start position of the peptide in fasta_seq
+    # We can use gregexpr for this:
+    match_pos <- gregexpr(peptide, fasta_seq, fixed = TRUE)[[1]]
+    if (match_pos[1] == -1) {
+      # Peptide not found, skip
+      return(NULL)
+    }
+    
+    # Find the first match that does not overlap with used_positions
+    for (pos in match_pos) {
+      start_pos <- pos
+      end_pos <- start_pos + nchar(peptide) - 1
+      if (!any(used_positions >= start_pos & used_positions <= end_pos)) {
+        # Mark these positions as used
+        used_positions[start_pos:end_pos] <- TRUE
+        # Create a data frame of all positions covered by this peptide
+        return(data.frame(position = start_pos:end_pos,
+                          jenks_class = jenks_class,
+                          stringsAsFactors = FALSE))
+      }
+    }
+    # If all matches overlap, skip
+    return(NULL)
+  }
+  
+  # Initialize a vector to keep track of used positions
+  used_positions <- rep(FALSE, nchar(fasta_seq))
+  
+  # Apply this to all peptides
+  position_data_list <- lapply(seq_len(nrow(jenks_df)), function(i) {
+    current_peptide <- jenks_df$peptides[i]
+    current_class <- jenks_df$jenks_class[i]
+    
+    # Check if peptide is non-empty
+    if (is.na(current_peptide) || current_peptide == "") return(NULL)
+    create_position_data(current_peptide, current_class, fasta_seq, used_positions)
+  })
+  
+  # Combine all
+  position_data <- do.call(rbind, position_data_list)
+  
+  # If no data, return NULL or a simple message
+  if (is.null(position_data) || nrow(position_data) == 0) {
+    warning("No peptide position data available for plotting.")
+    return(NULL)
+  }
+  
+  # Now we have a data frame with columns: position, jenks_class
+  # We can make a density plot by jenks_class
+  p <- ggplot(position_data, aes(x = position, fill = jenks_class,
+                                 text = paste("Class:", jenks_class))) +
+    geom_density(alpha = 0.5, lwd = 0.3) +
+    # scale_fill_manual(values = c("Negative correlation" = "#4E79A7", 
+    #                              "No correlation" = "gray",
+    #                              "Weak correlation" = "#F28E4C",  
+    #                              "Moderate correlation" = "#E15759", 
+    #                              "Strong correlation" = "#F28BBB")) +
+    scale_fill_manual(values = c("No correlation" = "grey",
+                                 "Weak correlation" = "#9ccfe7",  
+                                 "Moderate correlation" = "#629db8", 
+                                 "Strong correlation" = "#206e8c")) +
+    theme_minimal() +
+    labs(
+      title = paste("Peptide Density by Jenks Class -", ioi),
+      x = "Amino Acid Position",
+      y = "Density",
+      fill = "Correlation Category"
+    ) +
+    theme(
+      legend.title = element_blank()
+    )
+  
+  return(p)
+}
+
+
+
+# Combined Plot Function
+combined_interpro_density_plot <- function(ioi, interpro_file, uniprot_ids, 
+                                           peptide_seq_list_file = NULL, fasta_file = NULL, 
+                                           abundance_file = NULL, abundance_column = "quant",
+                                           correlation_palette = c("red", "gray", "blue"), 
+                                           interpro_colors = c("#FF5376", "#72AFD9", "#E3D26F", 
+                                                               "#A288E3", "#1B5299", "#68D8D6", "#B78DA3")) {
+  
+  # Generate the Heatmaply Plot
+  heatmap_plot <- interpro_plot(
+    ioi = ioi,
+    interpro_file = interpro_file,
+    uniprot_ids = uniprot_ids,
+    peptide_seq_list_file = peptide_seq_list_file,
+    fasta_file = fasta_file,
+    abundance_file = abundance_file,
+    abundance_column = abundance_column,
+    correlation_palette = correlation_palette,
+    interpro_colors = interpro_colors
+  )
+
+  # Generate the Density Plot using ggplot2
+  density_plot_gg <- jenks_density_plot(
+    ioi = ioi,
+    peptide_seq_list_file = peptide_seq_list_file,
+    uniprot_ids = uniprot_ids,
+    fasta_file = fasta_file
+  )
+  
+  # Convert ggplot2 Density Plot to Plotly Object
+  density_height <- 150
+  if(!is.null(density_plot_gg)){
+    density_plotly <- ggplotly(density_plot_gg, tooltip = "text", height = density_height) %>%
+      layout(showlegend = TRUE,
+             legend = list(
+               itemwidth = 15,
+               tracegroupgap = 1
+               )
+             )
+               
+  } else {
+    # If density plot is NULL, proceed with heatmap only
+    return(heatmap_plot)
+  }
+  
+  # Remove x-axis title and tick labels from density plot to align with heatmap
+  density_plotly <- layout(density_plotly, xaxis = list(title = "", showticklabels = FALSE))
+
+  # Ensure the heatmap and density plot share the same x-axis range
+  heatmap_xrange <- heatmap_plot$x$layout$xaxis$range
+  density_plotly <- layout(density_plotly, xaxis = list(range = heatmap_xrange))
+  
+  # Total height of the heatmap based on the number of rows
+  heatmap_height <- heatmap_plot$height
+  
+  # Total plot height should be 800 px
+  total_height <- 800
+
+  # Combine Heatmap and Density Plot using subplot
+  combined_plot <- subplot(
+    density_plotly,
+    heatmap_plot,
+    nrows = 2, 
+    shareX = TRUE, 
+    margin = 0,
+    heights = c(density_height/total_height, heatmap_height/total_height)
+  ) %>%
+    layout(
+      title = list(
+        text = paste("MS Peptide Mapping & Correlation to Olink -", ioi),
+        font = list(size = 12)),
+      xaxis = list(title = "Amino Acid Position"),
+      yaxis = list(showticklabels = FALSE),
+      margin = list(t = 30, b = 25, l = 50, r = 0),
+      legend = list(font = list(size = 8), title = list(font = list(size = 10))),
+      annotations = list(
+        list(
+          x = -0.01, y = 0.5,
+          showarrow = FALSE,
+          text = 'Density',
+          xref = 'paper', yref = 'y1 domain',
+          xanchor = 'right', yanchor = 'middle',
+          font = list(size = 10),
+          textangle = -90
+        ),
+        list(
+          x = -0.01, y = 0.5,
+          showarrow = FALSE,
+          text = 'Protein Domains',
+          xref = 'paper', yref = 'y3 domain',
+          xanchor = 'right', yanchor = 'middle',
+          font = list(size = 10),
+          textangle = -90
+        ),
+        list(
+          x = -0.01, y = 0.5,
+          showarrow = FALSE,
+          text = 'MS Peptides',
+          xref = 'paper', yref = 'y2 domain',
+          xanchor = 'right', yanchor = 'middle',
+          font = list(size = 10),
+          textangle = -90
+        )
+      )
+      )
+  
+  return(combined_plot)
+}
+
+
+# Define UI
+# ui <- fluidPage(
+#   tags$head(
+#     tags$style(HTML("
+#       .filters-active {
+#         background-color: #007bff !important;
+#         color: white !important;
+#       }
+#       .custom-slider .js-range-slider .irs-bar {
+#         background: linear-gradient(to right, #007bff 0%, #007bff 50%, #ccc 50%, #ccc 100%);
+#       }
+#       .custom-slider .js-range-slider .irs-line {
+#         background: transparent;
+#       }
+#     "))
+#   ),
+#   titlePanel("Clustering Analysis Explorer"),
+#   sidebarLayout(
+#     sidebarPanel(
+#       div(
+#         actionButton("filters_button", "Filters", icon = icon("filter")),
+#         div(
+#           id = "filters_dropdown",
+#           style = "display: none;",
+#           numericInput("anova_threshold", "ANOVA p-value Threshold", value = 1, max = 1, min = 0, step = .05),
+#           numericInput("kruskal_threshold", "Kruskal-Wallis p-value Threshold", value = 1, max = 1, min = 0, step = .05),
+#           actionButton("update", "Update Filters"),
+#           actionButton("clear_filters", "Clear Filters")
+#         )
+#       ),
+#       uiOutput("select_result_ui")
+#     ),
+#     mainPanel(
+#       tabsetPanel(
+#         id = "main_tabs",
+#         tabPanel("Summary", plotOutput("summary_plot"), plotOutput("volcano_plot")),
+#         tabPanel("Detailed Plot",
+#                  div(
+#                    id = "detailed_plot_container",
+#                    plotOutput("detailed_vln_plot"),
+#                    plotOutput("detailed_plot"),
+#                    div(id = "loading", "Loading...", style = "display:none;")
+#                  )
+#         )
+#       )
+#     )
+#   ),
+#   tags$head(
+#     tags$script(HTML("
+#       Shiny.addCustomMessageHandler('toggleLoading', function(show) {
+#         if (show) {
+#           document.getElementById('loading').style.display = 'block';
+#         } else {
+#           document.getElementById('loading').style.display = 'none';
+#         }
+#       });
+# 
+#       $(document).on('click', '#filters_button', function() {
+#         $('#filters_dropdown').toggle();
+#       });
+# 
+#       Shiny.addCustomMessageHandler('toggleFilterIndicator', function(active) {
+#         if (active) {
+#           $('#filters_button').addClass('filters-active');
+#         } else {
+#           $('#filters_button').removeClass('filters-active');
+#         }
+#       });
+# 
+#       // Update slider bar color dynamically
+#       $(document).on('input', '.slider-bar-custom .js-range-slider', function() {
+#         var value = $(this).prop('value');
+#         var max = $(this).prop('max');
+#         var percentage = (value / max) * 100;
+#         $(this).closest('.slider-bar-custom').find('.irs-bar').css('background', 'linear-gradient(to right, #007bff ' + percentage + '%, #ccc ' + percentage + '%, #ccc 100%)');
+#       });
+# 
+#       // Initialize slider bar color on page load
+#       $(document).ready(function() {
+#         $('.slider-bar-custom .js-range-slider').trigger('input');
+#       });
+#     "))
+#   )
+# )
+
+my_theme <- bs_theme(
+  version = 4,
+  bootswatch = "flatly",
+  base_font = font_google("Open Sans"),
+  heading_font = font_google("Open Sans"),
+  primary = "#FF876F",
+  fg = '#4F0433', 
+  bg = "#fff",
+  "font-size-base" = "0.9rem"
+)
+
+cor_intervals <- function(x) {
+  cut(x, breaks = c(-1, 0.3, 0.5, 0.7, 1),
+      labels = c('No correlation','Weak correlation', 
+                 'Moderate correlation', 'Strong correlation'),
+      include.lowest = TRUE, right = FALSE)
+}
+
+
+ui <- fluidPage(
+  theme = my_theme,
+  tags$head(
+    tags$link(rel = "stylesheet", href = "https://fonts.googleapis.com/css2?family=Fascinate+Inline&display=swap")
+  ),
+  tags$style(HTML("
+h1, h2, h3, h4 {
+      font-family: 'Fascinate Inline', cursive;
+      color: #ff5c8d; /* Vibrant pink-orange color */
+}
+    .shiny-plot-output, .plotly {
+        border-radius: 15px;
+        overflow: hidden;
+    }
+      .nav-tabs + .tab-content {
+      background-color: #fff;
+      padding: 15px; /* optional, for spacing */
+      }
+    .nav-tabs .nav-item .nav-link.active {
+      background-color: #FEEEEB;
+      border-color: #fff;
+    }
+    .info-icon {
+      font-size: 0.9em; 
+      color: #666; 
+      margin-left: 5px; 
+      cursor: help;
+    }
+    .plot-title {
+      font-size: 1rem; 
+      font-weight: 600;
+      margin-bottom: 0.5em;
+    }
+    .sidebar-section {
+      margin-bottom: 15px;
+    }
+  ")),
+  titlePanel(
+    "PeptOlink",
+    windowTitle = "PeptOlink"
+  ),
+  fluidRow(
+    column(3,
+           div(class = "sidebar-section",
+               # Filters
+               dropdownButton(
+                 inputId = "filters_dropdown_btn",
+                 label = "Filters",
+                 icon = icon("sliders-h"),
+                 status = "primary",
+                 circle = FALSE,
+                 inline = TRUE,
+                 
+                 numericInput("var_corr", "Correlation variance >=", 
+                              value = 0, max = 1, min = 0, step = .01),
+                 numericInput("mean_corr", "Mean correlation ≤", 
+                              value = 1, max = 1, min = -1, step = .01),
+                 numericInput("n_peptides", "Number of peptides >=", 
+                              value = 10, max = 500, min = 1, step = 5),
+                 actionBttn("clear_filters", "Clear", icon = icon("times"), style = "bordered", size = "xs")
+               )
+           ),
+           div(class = "sidebar-section",
+               uiOutput("select_result_ui")
+           )
+    ),
+    column(9,
+           tabsetPanel(
+             id = "main_tabs",
+             
+             # Detailed first
+             # Replace plotOutput with plotlyOutput for interactive plots
+             tabPanel("Detailed",
+                      fluidRow(
+                        column(12,
+                               span("Gene-specific Data", class = "plot-title"),
+                               icon("info-circle", class = "info-icon", id = "detailed_info")
+                        )
+                      ),
+                      br(),
+                      fluidRow(
+                        column(12,
+                               withSpinner(plotlyOutput("detailed_plot", height = "800px"), type = 4) 
+                        )
+                      )
+             ),
+             
+             
+             # Summary second
+             tabPanel("Summary",
+                      fluidRow(
+                        column(12,
+                               span("Summary of Filtered Results", class = "plot-title"),
+                               icon("info-circle", class = "info-icon", id = "summary_info")
+                        )
+                      ),
+                      br(),
+                      fluidRow(
+                        column(6, withSpinner(plotOutput("summary_plot", height = "300px"), type = 4)),
+                        column(6, withSpinner(plotOutput("volcano_plot", height = "300px"), type = 4))
+                      )
+             )
+           )
+    )
+  )
+)
+
+# Define server logic
+server <- function(input, output, session) {
+  # Load the data
+  correlation_long_filt <- read.csv('data/peptide_cors_overlappingProteins_filt.csv') |> 
+    mutate(gene_symbol = Gene.Name.MS) |> 
+    dplyr::rename(correlation = Correlation)
+  #anova_results <- readRDS("data/ANOVA_CLUSTER_leiden_1_partition_peptides_bypeptide.RDS")
+  #kruskal_results <- readRDS("data/KRUSKAL_CLUSTER_leiden_1_partition_peptides_bypeptide.RDS")
+  
+  gene_stats <- correlation_long_filt %>%
+    group_by(gene_symbol) %>%
+    summarise(
+      mean_corr = mean(correlation, na.rm = TRUE),
+      var_corr = var(correlation, na.rm = TRUE),
+      n_peptides = n()
+    )
+  
+  # Corrected filtered_data reactive expression
+  filtered_data <- reactive({
+    req(input$var_corr, input$mean_corr, input$n_peptides)  # Ensure the correct inputs are available
+    
+    # Filter gene_stats based on the new input IDs and logic (≤ instead of ≥)
+    filtered_genes <- gene_stats %>%
+      filter(
+        var_corr >= input$var_corr,
+        mean_corr <= input$mean_corr,
+        n_peptides >= input$n_peptides
+      ) %>%
+      pull(gene_symbol)
+    
+    filtered <- correlation_long_filt %>%
+      filter(gene_symbol %in% filtered_genes)
+    
+    # If no data after filtering, return NULL
+    if (nrow(filtered) == 0) {
+      return(NULL)
+    }
+    
+    # Apply fixed correlation intervals instead of Jenks
+    filtered <- filtered %>%
+      mutate(jenks_class = cor_intervals(correlation))
+    
+    return(filtered)
+  })
+  
+  
+  # #Update filtered data when thresholds change
+  #Not needed -- REACTIVE
+  # observeEvent(input$update, {
+  #   anova_filtered <- anova_results %>%
+  #     filter(p.value <= input$anova_threshold)
+  #   
+  #   kruskal_filtered <- kruskal_results %>%
+  #     filter(p.value <= input$kruskal_threshold)
+  #   
+  #   new_data <- correlation_long_filt %>%
+  #     filter(gene_symbol %in% anova_filtered$gene_symbol,
+  #            gene_symbol %in% kruskal_filtered$gene_symbol)
+  #   
+  #   filtered_data(new_data)  # Update the reactive value
+  #   
+  #   # Update UI and indicators
+  #   session$sendCustomMessage("toggleFilterIndicator", TRUE)
+  #   updateTabsetPanel(session, "main_tabs", selected = "Summary")
+  #   session$sendCustomMessage("toggleLoading", FALSE)
+  # })
+  
+  # Clear filters and reset data
+  # observeEvent(input$clear_filters, {
+  #   filtered_data(correlation_long_filt)  # Reset to the full dataset
+  #   
+  #   # Reset thresholds
+  #   updateNumericInput(session, "anova_threshold", value = 1)
+  #   updateNumericInput(session, "kruskal_threshold", value = 1)
+  #   
+  #   # Update UI and indicators
+  #   session$sendCustomMessage("toggleFilterIndicator", FALSE)
+  #   updateTabsetPanel(session, "main_tabs", selected = "Summary")
+  #   session$sendCustomMessage("toggleLoading", FALSE)
+  # })
+  observeEvent(input$clear_filters, {
+    # Reset thresholds
+    #updateNumericInput(session, "anova_threshold", value = 1)
+    #updateNumericInput(session, "kruskal_threshold", value = 1)
+    # No separate update, filtered_data will naturally reflect new values
+  })
+  
+  # UI for selecting results
+  output$select_result_ui <- renderUI({
+    fd <- filtered_data()
+    if (is.null(fd) || nrow(fd) == 0) {
+      return(tags$div("No results match the current filters.", class="text-danger"))
+    }
+    choices <- unique(fd$gene_symbol)
+    selectInput("selected_result", "Select Gene:", choices = choices, selected = choices[1])
+  })
+  
+  observeEvent(input$selected_gene, {
+    plasma_data <- plasma_dt[.(input$selected_gene)] # Fast subset
+  })
+  
+  output$summary_plot <- renderPlot({
+    fd <- filtered_data()
+    req(fd)
+    fd_sampled <- fd %>% sample_n(min(nrow(fd), 5000))
+    
+    fd_sampled <- fd_sampled %>% mutate(jenks_class = cor_intervals(correlation))
+    ggviolin(fd_sampled, x = "jenks_class", y = "correlation", color = "jenks_class", 
+             add = "jitter", palette = "jco") +
+      labs(x = "Classification", y = "Correlation") +
+      theme(plot.title = element_text(face="bold"))
+  })
+  
+  output$volcano_plot <- renderPlot({
+    fd <-  gene_stats %>% filter(!is.na(var_corr))
+    req(fd)
+    fd_sampled <- fd %>% sample_n(min(nrow(fd), 5000))
+    
+    
+    ggplot(fd_sampled, aes(x = mean_corr, y = var_corr, size = n_peptides)) +
+      geom_point(alpha=0.7) +
+      scale_color_manual(values = c("grey60", "#E15759")) +
+      labs(x = "Mean correlation", y = "Variation") +
+      theme(plot.title = element_text(face="bold"), legend.title = element_blank())
+  })
+  
+  output$detailed_plot <- renderPlotly({
+    req(input$selected_result)
+    
+    # # Use a reactive expression for selected_plasma_data
+    # selected_plasma <- plasma_dt[.(input$selected_result)]
+    # 
+    # interpro_plot(
+    #   ioi = input$selected_result,
+    #   interpro_file = "data/interpro_domains.RDS",
+    #   uniprot_ids = selected_plasma,  # Pass the correct subset
+    #   peptide_seq_list_file = "data/peptide_seq_list.RDS",
+    #   correlation_palette = correlation_palette,
+    #   interpro_colors = c("#CCDDAA", "#EEEEBB", "#FFCCCC", "#DDDDDD", "#BBCCEE", "#CCEEFF")
+    #)
+    
+    # Call the combined plot function
+    combined_interpro_density_plot(
+      ioi = input$selected_result,
+      interpro_file = "data/interpro_domains.RDS",
+      uniprot_ids = plasma_dt,  
+      peptide_seq_list_file = "data/peptide_seq_list.RDS",
+      fasta_file = plasma_dt,
+      abundance_file = NULL, 
+      abundance_column = "quant",
+      correlation_palette =  correlation_palette,
+      interpro_colors = c("#CCDDAA", "#EEEEBB", "#FFCCCC", "#DDDDDD", "#BBCCEE", "#CCEEFF")
+    ) |> 
+      config(
+        # add download button
+        toImageButtonOptions = list(
+          format = "svg",
+          filename = paste0('heatmap_', input$selected_result),
+          width = 650,
+          height = 300
+        )
+      )
+  })
+  
+  addPopover(session, "summary_info", 
+             title = NULL, 
+             content = "View overall distributions and volcano plot. Adjust filters in the sidebar to refine.",
+             placement = "right", 
+             trigger = "hover")
+  
+  addPopover(session, "detailed_info", 
+             title = NULL, 
+             content = "Explore gene-specific positional data (density & InterPro domains) and classification-based comparisons.",
+             placement = "right", 
+             trigger = "hover")
+}
+
+
+shinyApp(ui = ui, server = server)
