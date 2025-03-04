@@ -1,6 +1,12 @@
 # Base image
 FROM rocker/shiny:4.4.2
 
+# Import GPG key
+RUN apt-get update || true
+RUN apt-get install -y wget
+RUN wget -qO - "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x871920D1991BC93C" | apt-key add -
+
+
 # General updates
 RUN apt-get update && \
     apt-get upgrade -y && \
