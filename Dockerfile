@@ -4,7 +4,7 @@ FROM rocker/shiny:4.4.2
 # General updates
 RUN apt-get update && \
     apt-get upgrade -y && \
-    apt-get install -y git libxml2-dev libmagick++-dev libssl-dev libharfbuzz-dev libfribidi-dev && \
+    apt-get install -y git cmake libxml2-dev libmagick++-dev libssl-dev libharfbuzz-dev libfribidi-dev && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
