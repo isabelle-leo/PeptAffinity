@@ -108,7 +108,7 @@ get_FASTA_fromalphafold <- function(alphafold_file){
 get_peptide_and_correlation_numeric <- function(fasta_list, peptide_seq_list, exclude = TRUE){
   peptide_indices <- list()
   for( i in 1:length(peptide_seq_list$peptides)){
-    peptide_indices[[rownames(peptide_seq_list[i,])]] <- data.frame(nchar(gsub(paste0(peptide_seq_list$peptides[i], ".*"), "", fasta_list)) + 1,
+    peptide_indices[[rownames(peptide_seq_list[i,])]] <- data.frame(regexpr(peptide_seq_list$peptides[i], fasta_list, fixed=TRUE),
                                                                     peptide_seq_list$peptide[i],
                                                                     peptide_seq_list$N[i],
                                                                     peptide_seq_list$target_correlation[i])
@@ -259,6 +259,7 @@ interpro_plot <- function(ioi, interpro_file, uniprot_ids, peptide_seq_list_file
   colnames(meta_hmap) <- c("Amino acid residue", "Olink target correlation")
   meta_hmap[,'Amino acid residue'] <- as.numeric(1:nchar(fasta_list[[1]]))
   
+  
   # Function to process peptides and handle overlaps (as before)
   process_peptides <- function(col) {
     overlap_peptides <- list()
@@ -266,7 +267,20 @@ interpro_plot <- function(ioi, interpro_file, uniprot_ids, peptide_seq_list_file
       start <- as.numeric(peptide_indices[[k]][["start_position"]])
       end <- start + nchar(peptide_indices[[k]][["peptide"]]) - 1
       added_to_overlap <- FALSE
+      cat("k =", k, "peptide =", peptide_indices[[k]][["peptide"]], "\n")
       
+      before_len <- nchar(fasta_list)
+      after_sub  <- gsub(paste0(peptide_indices[[k]][["peptide"]], ".*"), "", fasta_list)
+      cat("Before length =", before_len, 
+          "After length =", nchar(after_sub), 
+          "start_position =", nchar(after_sub) + 1, 
+          "\n"
+      )
+      if (start < 1 || end > nrow(meta_hmap)) {
+        # skip this peptide if it lacks valid mapping
+        # some lack valid mapping!!!!
+        next
+      }
       if(all(is.na(meta_hmap[start:end, col]))){
         meta_hmap[start:end, col] <- rep(peptide_indices[[k]][["target_correlation"]], times = length(start:end))
       } else {
