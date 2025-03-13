@@ -1089,7 +1089,7 @@ h1, h2, h3, h4 {
              tabPanel("Detailed",
                       fluidRow(
                         column(12,
-                               span("Gene-specific Data", class = "plot-title"),
+                               span("Isoform-specific Data", class = "plot-title"),
                                icon("info-circle", class = "info-icon", id = "detailed_info")
                         )
                       ),
