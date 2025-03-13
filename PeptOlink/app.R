@@ -29,7 +29,7 @@ showtext_auto()  # Enable showtext globally
 
 theme_minimal(base_family = "open-sans")
 
-plasma_data <- readRDS("data/plasma_data_FASTA_by_gene.RDS")
+plasma_data <- readRDS("data/plasma_data_FASTA_isoforms.RDS")
 plasma_dt <- as.data.table(plasma_data)
 setkey(plasma_dt, Gene.Name)
 
@@ -253,7 +253,7 @@ interpro_plot <- function(ioi, interpro_file, uniprot_ids, peptide_seq_list_file
                               error = function(e){0})
   
   interpro_options <- unique(interpro_ioi$interpro_description)
-
+  
   # Initialize meta_hmap with two columns: Amino acid residue, Olink target correlation
   meta_hmap <- matrix(nrow = nchar(fasta_list[[1]]), ncol = 2)
   colnames(meta_hmap) <- c("Amino acid residue", "Olink target correlation")
@@ -423,13 +423,13 @@ interpro_plot <- function(ioi, interpro_file, uniprot_ids, peptide_seq_list_file
     colv = F,
     Rowv = F,
     plot_method ='plotly',
-    col_side_palette = colorRampPalette(brewer.pal(9, 'PuBuGn')[2:8]), # not working at the moment
+    col_side_palette = colorRampPalette(brewer.pal(9, 'PuBuGn')[2:8]), # not working at the moment, works if you don't use "plotly" but then rest is broken
     hoverinfo = "text",
     subplot_heights = c(domain_height, peptide_height),
     height = total_height,
     custom_hovertext = t(hover_text), # for hover
     dendrogram = "none"
-    ) %>%
+  ) %>%
     colorbar(
       title = "MS-Olink correlation", 
       titlefont = list(size = 10), 
@@ -442,7 +442,7 @@ interpro_plot <- function(ioi, interpro_file, uniprot_ids, peptide_seq_list_file
       yanchor = 'bottom',
       thickness = 15,
       yref = 'paper'
-      )
+    )
   
   # Remove colorbar and legend for domain plot
   heatmap$x$data[[1]]$showscale <- FALSE
@@ -456,18 +456,18 @@ interpro_plot <- function(ioi, interpro_file, uniprot_ids, peptide_seq_list_file
         tickvals = seq(100, nrow(cor_mat), by = 100),  # Set tick positions every 100
         ticktext = seq(100, nrow(cor_mat), by = 100),   # Set corresponding labels
         tickangle = 0
-        ),
+      ),
       yaxis = list(
         titlefont = list(size = 10),
         tickfont = list(size = 8),
         side = 'right'
-        ),
+      ),
       yaxis2 = list(
         title = 'MS Peptides',
         titlefont = list(size = 10),
         tickfont = list(size = 8)
-        )
       )
+    )
   
   return(heatmap)
   
@@ -769,7 +769,7 @@ combined_interpro_density_plot <- function(ioi, interpro_file, uniprot_ids,
     correlation_palette = correlation_palette,
     interpro_colors = interpro_colors
   )
-
+  
   # Generate the Density Plot using ggplot2
   density_plot_gg <- jenks_density_plot(
     ioi = ioi,
@@ -786,9 +786,9 @@ combined_interpro_density_plot <- function(ioi, interpro_file, uniprot_ids,
              legend = list(
                itemwidth = 15,
                tracegroupgap = 1
-               )
              )
-               
+      )
+    
   } else {
     # If density plot is NULL, proceed with heatmap only
     return(heatmap_plot)
@@ -796,7 +796,7 @@ combined_interpro_density_plot <- function(ioi, interpro_file, uniprot_ids,
   
   # Remove x-axis title and tick labels from density plot to align with heatmap
   density_plotly <- layout(density_plotly, xaxis = list(title = "", showticklabels = FALSE))
-
+  
   # Ensure the heatmap and density plot share the same x-axis range
   heatmap_xrange <- heatmap_plot$x$layout$xaxis$range
   density_plotly <- layout(density_plotly, xaxis = list(range = heatmap_xrange))
@@ -806,7 +806,7 @@ combined_interpro_density_plot <- function(ioi, interpro_file, uniprot_ids,
   
   # Total plot height should be 800 px
   total_height <- 800
-
+  
   # Combine Heatmap and Density Plot using subplot
   combined_plot <- subplot(
     density_plotly,
@@ -853,10 +853,59 @@ combined_interpro_density_plot <- function(ioi, interpro_file, uniprot_ids,
           textangle = -90
         )
       )
-      )
+    )
   
   return(combined_plot)
 }
+
+expand_semicolon_rows <- function(dt, columns_to_expand, sep = ";") {
+  # dt:                data.table to expand
+  # columns_to_expand: character vector of column names to split by `sep`
+  # sep:               the delimiter to split on, default ";"
+  
+  # Make a list to hold expanded rows
+  result_list <- vector("list", nrow(dt))
+  
+  # Iterate over each row
+  for (i in seq_len(nrow(dt))) {
+    # Extract the single row as a data.table
+    row_data <- dt[i]
+    
+    # Split each specified column into a character vector
+    splitted_cols <- lapply(columns_to_expand, function(col) {
+      # Convert to character to avoid factor issues
+      strsplit(as.character(row_data[[col]]), sep, fixed = TRUE)[[1]]
+    })
+    
+    # How many times do we need to replicate this row?
+    lengths_vec <- sapply(splitted_cols, length)
+    n_dups <- max(lengths_vec)
+    
+    # Create a copy of the row repeated n_dups times
+    expanded_dt <- row_data[rep(1, n_dups)]
+    
+    # Fill in each column with the single split values
+    for (j in seq_along(columns_to_expand)) {
+      colname <- columns_to_expand[j]
+      split_vals <- splitted_cols[[j]]
+      
+      # If this particular column had fewer splits than n_dups, 
+      # fill-forward the last entry
+      if (length(split_vals) < n_dups) {
+        split_vals <- c(split_vals, rep(tail(split_vals, 1), n_dups - length(split_vals)))
+      }
+      
+      expanded_dt[[colname]] <- split_vals
+    }
+    
+    # Store the expanded data.table for this row
+    result_list[[i]] <- expanded_dt
+  }
+  
+  # Combine everything into one expanded data.table
+  return(data.table::rbindlist(result_list, use.names = TRUE, fill = TRUE))
+}
+
 
 
 # Define UI
@@ -1026,7 +1075,9 @@ h1, h2, h3, h4 {
                )
            ),
            div(class = "sidebar-section",
-               uiOutput("select_result_ui")
+               uiOutput("select_result_ui"),
+               uiOutput("isoform_count_ui"),
+               uiOutput("isoform_select_ui")
            )
     ),
     column(9,
@@ -1167,9 +1218,68 @@ server <- function(input, output, session) {
     selectInput("selected_result", "Select Gene:", choices = choices, selected = choices[1])
   })
   
-  observeEvent(input$selected_gene, {
-    plasma_data <- plasma_dt[.(input$selected_gene)] # Fast subset
+  observeEvent(input$selected_result, {
+    plasma_data <- plasma_dt[.(input$selected_result)] # Fast subset
   })
+  
+  #Isoform -------
+  output$isoform_count_ui <- renderUI({
+    req(input$selected_result)
+    #Subset to the selected gene
+    sub_dt <- plasma_dt[Gene.Name == input$selected_result]
+    if (nrow(sub_dt) == 0) return(NULL)
+    
+    #Collect unique isoforms (can split on ";" for multi matching)
+    isoforms <- unique(unlist(strsplit(sub_dt$UniProt.MS, ";")))
+    num_iso <- length(isoforms)
+    
+    # Show the info in a gray box (inline style example)
+    div(
+      style = "background-color: #f9f9f9; border: 1px solid #ccc; padding: 5px; margin-bottom: 10px;",
+      paste0("For ", input$selected_result, ", there are ", num_iso, " isoforms detected.")
+    )
+  })
+  
+  output$isoform_select_ui <- renderUI({
+    req(input$selected_result)
+    sub_dt <- plasma_dt[Gene.Name == input$selected_result]
+    if (nrow(sub_dt) == 0) return(NULL)
+    
+    isoforms <- unique(unlist(strsplit(sub_dt$UniProt.MS, ";")))
+    # Safely select first isoform if available
+    default_selected <- if (length(isoforms) > 0) isoforms[1] else NULL
+    
+    selectInput("selected_isoforms", 
+                "Select Isoform(s):", 
+                choices = isoforms, 
+                selected = default_selected, 
+                multiple = FALSE)
+  })
+  
+  working_plasma_dt <- reactive({
+    req(input$selected_result)  # Must have a gene
+    dt <- plasma_dt[Gene.Name == input$selected_result]
+    
+    # If isoforms are chosen, subset further
+    if (!is.null(input$selected_isoforms) && length(input$selected_isoforms) > 0) {
+      
+      cols_to_expand <- c("UniProt.MS", 
+                          "fasta")
+      
+      
+      dt <- expand_semicolon_rows(dt, columns_to_expand = cols_to_expand)
+      
+      # Commented out - grep strategy to include them without any collapsing
+      # pattern <- paste(input$selected_isoforms, collapse="|")
+      # dt <- dt[grepl(pattern, UniProt.MS)]
+      dt <- dt[UniProt.MS %in% input$selected_isoforms]
+    }
+    
+    # Return a data.table
+    dt
+  })
+  
+  #Plots -----
   
   output$summary_plot <- renderPlot({
     fd <- filtered_data()
@@ -1215,9 +1325,9 @@ server <- function(input, output, session) {
     combined_interpro_density_plot(
       ioi = input$selected_result,
       interpro_file = "data/interpro_domains.RDS",
-      uniprot_ids = plasma_dt,  
+      uniprot_ids = working_plasma_dt(),  
       peptide_seq_list_file = "data/peptide_seq_list.RDS",
-      fasta_file = plasma_dt,
+      fasta_file = working_plasma_dt(),
       abundance_file = NULL, 
       abundance_column = "quant",
       correlation_palette =  correlation_palette,
@@ -1238,13 +1348,13 @@ server <- function(input, output, session) {
              title = NULL, 
              content = "View overall distributions and volcano plot. Adjust filters in the sidebar to refine.",
              placement = "right", 
-             trigger = "hover")
+             trigger = "click")
   
   addPopover(session, "detailed_info", 
              title = NULL, 
              content = "Explore gene-specific positional data (density & InterPro domains) and classification-based comparisons.",
              placement = "right", 
-             trigger = "hover")
+             trigger = "click")
 }
 
 
