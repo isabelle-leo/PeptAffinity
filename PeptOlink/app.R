@@ -108,7 +108,7 @@ get_FASTA_fromalphafold <- function(alphafold_file){
 get_peptide_and_correlation_numeric <- function(fasta_list, peptide_seq_list, exclude = TRUE){
   peptide_indices <- list()
   for( i in 1:length(peptide_seq_list$peptides)){
-    peptide_indices[[rownames(peptide_seq_list[i,])]] <- data.frame(nchar(gsub(paste0(peptide_seq_list$peptides[i], ".*"), "", fasta_list)),
+    peptide_indices[[rownames(peptide_seq_list[i,])]] <- data.frame(nchar(gsub(paste0(peptide_seq_list$peptides[i], ".*"), "", fasta_list)) + 1,
                                                                     peptide_seq_list$peptide[i],
                                                                     peptide_seq_list$N[i],
                                                                     peptide_seq_list$target_correlation[i])
