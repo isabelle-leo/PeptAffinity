@@ -1322,7 +1322,8 @@ server <- function(input, output, session) {
   
   output$detailed_plot <- renderPlotly({
     req(input$selected_result)
-    
+    req(input$selected_isoforms)
+    req(nrow(working_plasma_dt()) > 0)
     # # Use a reactive expression for selected_plasma_data
     # selected_plasma <- plasma_dt[.(input$selected_result)]
     # 
