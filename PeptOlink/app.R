@@ -1087,13 +1087,15 @@ h1, h2, h3, h4 {
                  circle = FALSE,
                  inline = TRUE,
                  
-                 numericInput("var_corr", "Correlation variance >=", 
+                 numericInput("var_corr", "Correlation variance ≥", 
                               value = 0, max = 1, min = 0, step = .01),
                  numericInput("mean_corr", "Mean correlation ≤", 
                               value = 1, max = 1, min = -1, step = .01),
-                 numericInput("n_peptides", "Number of peptides >=", 
+                 numericInput("n_peptides", "Number of peptides ≥", 
                               value = 10, max = 500, min = 1, step = 5),
-                 actionBttn("clear_filters", "Clear", icon = icon("times"), style = "bordered", size = "xs")
+                 numericInput("n_isoforms", "Number of isoforms ≥", 
+                              value = 1, max = 4, min = 1, step = 1),
+                 actionBttn("clear_filters", "Clear", icon = icon("times"), style = "unite", size = "xs")
                )
            ),
            div(class = "sidebar-section",
@@ -1157,19 +1159,20 @@ server <- function(input, output, session) {
     summarise(
       mean_corr = mean(correlation, na.rm = TRUE),
       var_corr = var(correlation, na.rm = TRUE),
-      n_peptides = n()
+      n_peptides = n(),
+      n_isoforms = length(unique(unlist(strsplit(paste(UniProt.MS, collapse = ";"), ";"))))
     )
   
-  # Corrected filtered_data reactive expression
+  
   filtered_data <- reactive({
-    req(input$var_corr, input$mean_corr, input$n_peptides)  # Ensure the correct inputs are available
+    req(input$var_corr, input$mean_corr, input$n_peptides, input$n_isoforms)  # Ensure the correct inputs are available
     
-    # Filter gene_stats based on the new input IDs and logic (≤ instead of ≥)
     filtered_genes <- gene_stats %>%
       filter(
         var_corr >= input$var_corr,
         mean_corr <= input$mean_corr,
-        n_peptides >= input$n_peptides
+        n_peptides >= input$n_peptides,
+        n_isoforms >= input$n_isoforms
       ) %>%
       pull(gene_symbol)
     
@@ -1224,10 +1227,14 @@ server <- function(input, output, session) {
   #   session$sendCustomMessage("toggleLoading", FALSE)
   # })
   observeEvent(input$clear_filters, {
+    
     # Reset thresholds
-    #updateNumericInput(session, "anova_threshold", value = 1)
-    #updateNumericInput(session, "kruskal_threshold", value = 1)
-    # No separate update, filtered_data will naturally reflect new values
+    # Goal: Show everything
+    updateNumericInput(session, "var_corr", value = 0)
+    updateNumericInput(session, "mean_corr", value = 1)
+    updateNumericInput(session, "n_peptides", value = 1)
+    updateNumericInput(session, "n_isoforms", value = 1)
+   
   })
   
   # UI for selecting results
