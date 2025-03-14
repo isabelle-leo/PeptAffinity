@@ -24,6 +24,13 @@ library(plotly)
 library(data.table)
 library(RColorBrewer)
 
+#   _____ ______ _______ _    _ _____  
+#  / ____|  ____|__   __| |  | |  __ \ 
+# | (___ | |__     | |  | |  | | |__) |
+#  \___ \|  __|    | |  | |  | |  ___/ 
+#  ____) | |____   | |  | |__| | |     
+# |_____/|______|  |_|   \____/|_|     
+
 font_add_google("Open Sans", "open-sans")  
 showtext_auto()  # Enable showtext globally
 
@@ -32,6 +39,29 @@ theme_minimal(base_family = "open-sans")
 plasma_data <- readRDS("data/plasma_data_FASTA_isoforms.RDS")
 plasma_dt <- as.data.table(plasma_data)
 setkey(plasma_dt, Gene.Name)
+
+
+color_breaks <- seq(-1, 1, length.out = 100)
+#correlation_palette <- viridis(100, option = "D")  
+correlation_palette <- colorRampPalette(rev(brewer.pal(11, 'Spectral')))(100)
+
+my_theme <- bs_theme(
+  version = 4,
+  bootswatch = "flatly",
+  base_font = font_google("Open Sans"),
+  heading_font = font_google("Open Sans"),
+  primary = "#FF876F",
+  fg = '#4F0433', 
+  bg = "#fff",
+  "font-size-base" = "0.9rem"
+)
+
+#  ______ _    _ _   _  _____ _______ _____ ____  _   _  _____ 
+# |  ____| |  | | \ | |/ ____|__   __|_   _/ __ \| \ | |/ ____|
+# | |__  | |  | |  \| | |       | |    | || |  | |  \| | (___  
+# |  __| | |  | | . ` | |       | |    | || |  | | . ` |\___ \ 
+# | |    | |__| | |\  | |____   | |   _| || |__| | |\  |____) |
+# |_|     \____/|_| \_|\_____|  |_|  |_____\____/|_| \_|_____/ 
 
 get_color_vector <- function (colors,
                               vec,
@@ -156,10 +186,6 @@ compute_wcss_bcss <- function(data) {
 }
 
 
-
-color_breaks <- seq(-1, 1, length.out = 100)
-#correlation_palette <- viridis(100, option = "D")  
-correlation_palette <- colorRampPalette(rev(brewer.pal(11, 'Spectral')))(100)
 
 
 compute_jenks_clusters_simple <- function(data, value_column = "correlation", n_classes = 3) {
@@ -1015,16 +1041,6 @@ expand_semicolon_rows <- function(dt, columns_to_expand, sep = ";") {
 #   )
 # )
 
-my_theme <- bs_theme(
-  version = 4,
-  bootswatch = "flatly",
-  base_font = font_google("Open Sans"),
-  heading_font = font_google("Open Sans"),
-  primary = "#FF876F",
-  fg = '#4F0433', 
-  bg = "#fff",
-  "font-size-base" = "0.9rem"
-)
 
 cor_intervals <- function(x) {
   cut(x, breaks = c(-1, 0.3, 0.5, 0.7, 1),
@@ -1032,6 +1048,29 @@ cor_intervals <- function(x) {
                  'Moderate correlation', 'Strong correlation'),
       include.lowest = TRUE, right = FALSE)
 }
+
+
+#  _______ _    _ _____  _____ 
+# |__   __| |  | |_   _|/ ____|
+#    | |  | |__| | | | | (___  
+#    | |  |  __  | | |  \___ \ 
+#    | |  | |  | |_| |_ ____) |
+#  __|_|  |_|__|_|_____|_____/ 
+# |_   _|/ ____|               
+#   | | | (___                 
+#   | |  \___ \                
+#  _| |_ ____) |               
+# |_____|_____/ _ ______       
+# |__   __| |  | |  ____|      
+#    | |  | |__| | |__         
+#    | |  |  __  |  __|        
+#    | |  | |  | | |____       
+#    |_|  |_|__|_|______|      
+#     /\   |  __ \|  __ \      
+#    /  \  | |__) | |__) |     
+#   / /\ \ |  ___/|  ___/      
+#  / ____ \| |    | |          
+# /_/    \_\_|    |_|          
 
 
 ui <- fluidPage(
