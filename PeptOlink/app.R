@@ -276,7 +276,8 @@ interpro_plot <- function(ioi, interpro_file, uniprot_ids, peptide_seq_list_file
           "start_position =", nchar(after_sub) + 1, 
           "\n"
       )
-      if (start < 1 || end > nrow(meta_hmap)) {
+      
+      if (is.na(start) || is.na(end) || start < 1 || end > nrow(meta_hmap) || start > end) {
         # skip this peptide if it lacks valid mapping
         # some lack valid mapping!!!!
         next
@@ -388,7 +389,7 @@ interpro_plot <- function(ioi, interpro_file, uniprot_ids, peptide_seq_list_file
   rownames(row_side_colors_df) <- rownames(cor_mat)
   
   # Create a continuous color scale for correlation from -1 to 1
-  # Use viridis or the given correlation_palette
+  # Use viridis or the publication palette
   # Already set scale -1 to 1:
   color_breaks <- seq(-1, 1, length.out = 100)
   correlation_palette <- colorRampPalette(correlation_palette)(100)
@@ -461,14 +462,21 @@ interpro_plot <- function(ioi, interpro_file, uniprot_ids, peptide_seq_list_file
   # Remove colorbar and legend for domain plot
   heatmap$x$data[[1]]$showscale <- FALSE
   
+  # Help if the isoform is too short
+  if (nrow(cor_mat) < 100) {
+    tickvals <- integer(0)
+  } else {
+    tickvals <- seq(100, nrow(cor_mat), by = 100)
+  }
+  
   heatmap <- heatmap %>% 
     layout(
       xaxis = list(
         title = 'Amino Acid Position',
         titlefont = list(size = 10),
         tickfont = list(size = 8),
-        tickvals = seq(100, nrow(cor_mat), by = 100),  # Set tick positions every 100
-        ticktext = seq(100, nrow(cor_mat), by = 100),   # Set corresponding labels
+        tickvals = tickvals, #seq(100, nrow(cor_mat), by = 100),  # Set tick positions every 100
+        ticktext = tickvals,  #seq(100, nrow(cor_mat), by = 100),   # Set corresponding labels
         tickangle = 0
       ),
       yaxis = list(
