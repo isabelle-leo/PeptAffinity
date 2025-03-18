@@ -21,7 +21,6 @@ library(viridis)
 library(heatmaply)
 library(purrr)
 library(plotly)
-library(data.table)
 library(RColorBrewer)
 
 #   _____ ______ _______ _    _ _____  
@@ -55,6 +54,11 @@ my_theme <- bs_theme(
   bg = "#fff",
   "font-size-base" = "0.9rem"
 )
+
+# Load the data
+correlation_long_filt <- read.csv('data/peptide_cors_overlappingProteins_filt.csv') |>
+  mutate(gene_symbol = Gene.Name.MS) |>
+  dplyr::rename(correlation = Correlation)
 
 #  ______ _    _ _   _  _____ _______ _____ ____  _   _  _____ 
 # |  ____| |  | | \ | |/ ____|__   __|_   _/ __ \| \ | |/ ____|
@@ -1100,10 +1104,7 @@ h1, h2, h3, h4 {
 
 # Define server logic
 server <- function(input, output, session) {
-  # Load the data
-  correlation_long_filt <- read.csv('data/peptide_cors_overlappingProteins_filt.csv') |> 
-    mutate(gene_symbol = Gene.Name.MS) |> 
-    dplyr::rename(correlation = Correlation)
+
   #anova_results <- readRDS("data/ANOVA_CLUSTER_leiden_1_partition_peptides_bypeptide.RDS")
   #kruskal_results <- readRDS("data/KRUSKAL_CLUSTER_leiden_1_partition_peptides_bypeptide.RDS")
   
