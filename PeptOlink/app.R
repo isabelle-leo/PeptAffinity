@@ -994,8 +994,9 @@ cor_intervals <- function(x) {
 ui <- fluidPage(
   theme = my_theme,
   tags$head(
-    tags$link(rel = "stylesheet", href = "https://fonts.googleapis.com/css2?family=Fascinate+Inline&display=swap")
-  ),
+    tags$link(rel = "stylesheet", href = "https://fonts.googleapis.com/css2?family=Fascinate+Inline&display=swap"),
+    tags$link(rel = "icon", type = "image/png", href = "icon.png")
+    ),
   tags$style(HTML("
 h1, h2, h3, h4 {
       font-family: 'Fascinate Inline', cursive;
