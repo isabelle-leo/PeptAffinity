@@ -80,7 +80,6 @@ correlation_palette_function <- function(x) {
     idx <- round((x - (-1)) / (0.3 - (-1)) * 99) + 1
     return(neut_pal[idx])
   }else {
-    # Map x from [0.3, 1] to palette indices [1, 100]
     idx <- round(100 - (x - .3) / (1 - .3) * 99) + 1
     return(viridis(100, option = "mako")[idx])
   }
@@ -551,7 +550,9 @@ interpro_plot <- function(ioi, interpro_file, uniprot_ids, peptide_seq_list_file
   # Help if the isoform is too short
   if (nrow(cor_mat) < 100) {
     tickvals <- integer(0)
-  } else {
+  } else if (nrow(cor_mat) > 2000) {
+    tickvals <- seq(1000, nrow(cor_mat), by = 1000)
+  }else {
     tickvals <- seq(100, nrow(cor_mat), by = 100)
   }
   
@@ -1372,7 +1373,7 @@ server <- function(input, output, session) {
       fasta_file = working_plasma_dt(),
       abundance_file = NULL, 
       abundance_column = "quant",
-      correlation_palette =  correlation_palette,
+      correlation_palette =  sapply(seq(-1, 1, length.out = 100), correlation_palette_function),
       interpro_colors = c("#CCDDAA", "#EEEEBB", "#FFCCCC", "#DDDDDD", "#BBCCEE", "#CCEEFF")
     ) |> 
       config(
