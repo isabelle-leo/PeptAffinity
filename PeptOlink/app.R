@@ -72,9 +72,9 @@ color_breaks <- seq(-1, 1, length.out = 100)
 correlation_palette_function <- function(x) {
   x <- pmax(pmin(x, 1), -1)
   if(x < .3) {
-    rocket_pal <- viridis(100, option = "rocket")
-    idx <- round((x - (-1)) / (.3 - (-1)) * (100 - 51)) + 51
-    return(rocket_pal[idx])
+    pink_pal <- colorRampPalette(c( "#ff5c8d", viridis(100, option = "mako")[100]))(100)
+    idx <- round((x - (-1)) / (0.3 - (-1)) * 99) + 1
+    return(pink_pal[idx])
   } else {
     # Map x from [0.3, 1] to palette indices [1, 100]
     idx <- round(100 - (x - .3) / (1 - .3) * 99) + 1
