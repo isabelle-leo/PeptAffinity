@@ -71,11 +71,15 @@ color_breaks <- seq(-1, 1, length.out = 100)
 
 correlation_palette_function <- function(x) {
   x <- pmax(pmin(x, 1), -1)
-  if(x < .3) {
-    pink_pal <- colorRampPalette(c( "#ff5c8d", viridis(100, option = "mako")[100]))(100)
-    idx <- round((x - (-1)) / (0.3 - (-1)) * 99) + 1
+  if(x < 0) {
+    pink_pal <- colorRampPalette(c("#e60045","#ff1a5e", "#ff5c8d", "#ff80a6", "#ffb3c9", "#ffe6ed"))(100)
+    idx <- round((x - (-1)) / (0 - (-1)) * 99) + 1
     return(pink_pal[idx])
-  } else {
+  } else if (0 < x & x < .3) {
+    neut_pal <- colorRampPalette(c("#ffe6ed", viridis(100, option = "mako")[100]))(100)
+    idx <- round((x - (-1)) / (0.3 - (-1)) * 99) + 1
+    return(neut_pal[idx])
+  }else {
     # Map x from [0.3, 1] to palette indices [1, 100]
     idx <- round(100 - (x - .3) / (1 - .3) * 99) + 1
     return(viridis(100, option = "mako")[idx])
