@@ -76,9 +76,9 @@ correlation_palette_function <- function(x) {
     pink_pal <- colorRampPalette(c("#e60045","#ff1a5e", "#ff5c8d", "#ff80a6", "#ffb3c9", "#ffe6ed"))(100)
     idx <- round((x - (-1)) / (0 - (-1)) * 99) + 1
     return(pink_pal[idx])
-  } else if (0 < x & x < .3) {
-    neut_pal <- colorRampPalette(c("#ffe6ed", viridis(100, option = "mako")[100]))(100)
-    idx <- round((x - (-1)) / (0.3 - (-1)) * 99) + 1
+  } else if (0 <= x && x < .3) {
+    neut_pal <- colorRampPalette(c("#ffe6ed", "gray95", viridis(100, option = "mako")[100]))(100)
+    idx <- round((x - 0) / (0.3 - 0) * 99) + 1
     return(neut_pal[idx])
   }else {
     idx <- round(100 - (x - .3) / (1 - .3) * 99) + 1
@@ -1019,27 +1019,6 @@ cor_intervals <- function(x) {
       include.lowest = TRUE, right = FALSE)
 }
 
-# Helper: Compute per-residue mean correlation from peptide indices
-get_residue_correlation <- function(fasta_seq, peptide_indices) {
-  n <- nchar(fasta_seq)
-  sum_corr <- numeric(n)
-  count_corr <- numeric(n)
-  
-  for (pep in peptide_indices) {
-    start <- as.numeric(pep$start_position)
-    pep_len <- nchar(pep$peptide)
-    end <- start + pep_len - 1
-    # Only update if positions are valid
-    if (!is.na(start) && start > 0 && end <= n) {
-      sum_corr[start:end] <- sum_corr[start:end] + pep$target_correlation
-      count_corr[start:end] <- count_corr[start:end] + 1
-    }
-  }
-  avg_corr <- sum_corr / count_corr
-  avg_corr[count_corr == 0] <- NA
-  return(avg_corr)
-}
-
 # Helper: Compute median correlation per residue based on peptide indices
 get_residue_correlation_median <- function(fasta_seq, peptide_indices) {
   n <- nchar(fasta_seq)
@@ -1165,6 +1144,31 @@ alphafold_plot <- function(ioi, genesymb, uniprot_ids,
   unlink(ioi_alphafold[["content"]])
   return(p)
 }
+
+color_scale_plot <- function(correlation_palette, n_bins = 100) {
+  # Create a data frame with evenly spaced values from -1 to 1
+  df <- data.frame(x = seq(-1, 1, length.out = n_bins), y = 1)
+  
+  p <- ggplot(df, aes(x = x, y = y, fill = x)) +
+    geom_tile() +
+    scale_fill_gradientn(colors = colorRampPalette(correlation_palette)(n_bins),
+                         limits = c(-1, 1)) +
+    scale_x_continuous(breaks = seq(-1, 1, by = 0.5), expand = c(0, 0)) +
+    scale_y_continuous(breaks = NULL, expand = c(0, 0)) +
+    theme_minimal(base_family = "Open Sans") +
+    theme(axis.title.y = element_blank(),
+          axis.text.y  = element_blank(),
+          axis.ticks.y = element_blank(),
+          axis.line.y  = element_blank(),
+          panel.grid   = element_blank(),
+          legend.position = "none",
+          plot.margin  = unit(c(0.2, 0.2, 0.2, 0.2), "cm")) +
+    labs(x = "Correlation", fill = NULL)
+  
+  return(p)
+}
+
+
 
 #  _______ _    _ _____  _____ 
 # |__   __| |  | |_   _|/ ____|
@@ -1293,6 +1297,14 @@ h1, h2, h3, h4 {
                       fluidRow(
                         column(12,
                                withSpinner(NGLVieweROutput("NGL_plot"), type = 4) 
+                        )
+                      ),
+                      br(),
+                      fluidRow(
+                        column(12,
+                               div(style = "display: flex; justify-content: center;",
+                                   plotOutput("color_scale", width = "60%", height = "80px")
+                               )
                         )
                       )
              ),
@@ -1505,16 +1517,37 @@ server <- function(input, output, session) {
   })
 
     
-  output$NGL_plot <- renderNGLVieweR({
+  # Check for the plot being possible using a reactive
+  ngl_plot_obj <- reactive({
     req(input$selected_result)
     req(input$selected_isoforms)
     req(nrow(working_plasma_dt()) > 0)
-    alphafold_plot(ioi = input$selected_isoforms, 
-                   genesymb = input$selected_result,
-                   uniprot_ids = working_plasma_dt(), 
-                   peptide_seq_list_file = "data/peptide_seq_list.RDS", 
-                   fasta_file = NULL, 
-                   correlation_palette = correlation_palette)
+    result <- try(
+      alphafold_plot(
+        ioi = input$selected_isoforms, 
+        genesymb = input$selected_result, 
+        uniprot_ids = working_plasma_dt(), 
+        peptide_seq_list_file = "data/peptide_seq_list.RDS", 
+        fasta_file = NULL, 
+        correlation_palette = correlation_palette
+      ),
+      silent = TRUE
+    )
+    if (inherits(result, "try-error")) return(NULL)
+    result
+  })
+  
+  # Render the NGL plot output
+  output$NGL_plot <- renderNGLVieweR({
+    req(ngl_plot_obj())
+    ngl_plot_obj()
+  })
+  
+  # Render the color scale only if the NGL plot is produced.
+  output$color_scale <- renderPlot({
+    if (is.null(ngl_plot_obj())) return(NULL)
+    color_scale_plot(correlation_palette = sapply(seq(-1, 1, length.out = 100), correlation_palette_function),
+                     n_bins = 100)
   })
 
   
