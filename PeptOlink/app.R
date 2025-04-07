@@ -88,7 +88,7 @@ correlation_palette_function <- function(x) {
 
 correlation_palette <- sapply(color_breaks, correlation_palette_function)
 
-color_scale_medians <- c("No correlation" = -0.35,  
+color_scale_medians <- c("No correlation" = -.1,  
              "Weak correlation" = 0.4, 
              "Moderate correlation" = 0.6,
              "Strong correlation" = 0.85)
