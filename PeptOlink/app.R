@@ -22,6 +22,7 @@ library(heatmaply)
 library(purrr)
 library(plotly)
 library(RColorBrewer)
+library(NGLVieweR)
 
 #   _____ ______ _______ _    _ _____  
 #  / ____|  ____|__   __| |  | |  __ \ 
@@ -142,56 +143,49 @@ get_color_vector <- function (colors,
   return(col_suppl)
 }
 
-get_alphafold_file <- function(ioi, uniprot_ids){
-  
-  uniprot_ids_options <- length(uniprot_ids[uniprot_ids$hgnc_symbol == ioi,]$uniprotswissprot)
-  request_num <- 1
-  
-  uniprot_ioi <- uniprot_ids[uniprot_ids$hgnc_symbol == ioi,]$uniprotswissprot[request_num]
-  #add the file type
+get_alphafold_file <- function(ioi){
+  # Build the AlphaFold URL directly using the isoform
   alphafold_path <- paste0(tempfile(), ".pdb")
-  alphafold_file <- curl_fetch_disk(url = paste0("https://alphafold.ebi.ac.uk/files/AF-",uniprot_ioi,"-F1-model_v4.pdb"),
+  url <- paste0("https://alphafold.ebi.ac.uk/files/AF-", ioi, "-F1-model_v4.pdb")
+  
+  alphafold_file <- curl_fetch_disk(url = url,
                                     handle = new_handle(),
                                     path = alphafold_path)
   
-  while(request_num <= uniprot_ids_options & alphafold_file[["status_code"]] == 404){
-    request_num <-  request_num +1
-    uniprot_ioi <- uniprot_ids[uniprot_ids$hgnc_symbol == ioi,]$uniprotswissprot[request_num]
-    alphafold_file <- curl_fetch_disk(url = paste0("https://alphafold.ebi.ac.uk/files/AF-",uniprot_ioi,"-F1-model_v4.pdb"),
-                                      handle = new_handle(),
-                                      path = alphafold_path)
+  if (alphafold_file[["status_code"]] == 404) {
+    stop("No AlphaFold structure was found for the provided isoform.")
   }
   
   return(alphafold_file)
 }
 
+
 get_FASTA_fromalphafold <- function(alphafold_file){
-  
+  # Extract the uniprot isoform id from the AlphaFold file URL
   uniprot_ioi <- gsub("https://alphafold.ebi.ac.uk/files/AF-", "", alphafold_file[["url"]])
   uniprot_ioi <- gsub("-F1-model_v4.pdb", "", uniprot_ioi)
   
-  #add the file type
+  # Define temporary path and fetch the FASTA file from UniProt
   FASTA_path <- paste0(tempfile(), ".fasta")
-  FASTA_file <- curl_fetch_disk(url = paste0('https://rest.uniprot.org/uniprotkb/', uniprot_ioi, '.fasta'),
+  url <- paste0("https://rest.uniprot.org/uniprotkb/", uniprot_ioi, ".fasta")
+  FASTA_file <- curl_fetch_disk(url = url,
                                 handle = new_handle(),
                                 path = FASTA_path)
   
-  AASeq <- readFASTA(file = FASTA_file[["content"]])
+  if (FASTA_file[["status_code"]] != 200) {
+    stop("Failed to fetch FASTA file from UniProt.")
+  }
+  
+  # Read the FASTA sequence
+  AASeq <- readFASTA(file = FASTA_path)
   fasta_seq <- toString(AASeq[[1]])
+  
+  # Clean up temporary file
+  unlink(FASTA_path)
+  
   return(fasta_seq)
-  
-  unlink(FASTA_file)
-  
-  # while(request_num <= uniprot_ids_options & alphafold_file[["status_code"]] == 404){
-  #   request_num <-  request_num +1
-  #   uniprot_ioi <- uniprot_ids[uniprot_ids$hgnc_symbol == ioi,]$uniprot_gn_id[request_num]
-  #   alphafold_file <- curl_fetch_disk(url = paste0("https://alphafold.ebi.ac.uk/files/AF-",uniprot_ioi,"-F1-model_v4.pdb"),
-  #                                     handle = new_handle(),
-  #                                     path = alphafold_path)
-  # }
-  
-  #return(AASeq)
 }
+
 
 
 get_peptide_and_correlation_numeric <- function(fasta_list, peptide_seq_list, exclude = TRUE){
@@ -1025,6 +1019,152 @@ cor_intervals <- function(x) {
       include.lowest = TRUE, right = FALSE)
 }
 
+# Helper: Compute per-residue mean correlation from peptide indices
+get_residue_correlation <- function(fasta_seq, peptide_indices) {
+  n <- nchar(fasta_seq)
+  sum_corr <- numeric(n)
+  count_corr <- numeric(n)
+  
+  for (pep in peptide_indices) {
+    start <- as.numeric(pep$start_position)
+    pep_len <- nchar(pep$peptide)
+    end <- start + pep_len - 1
+    # Only update if positions are valid
+    if (!is.na(start) && start > 0 && end <= n) {
+      sum_corr[start:end] <- sum_corr[start:end] + pep$target_correlation
+      count_corr[start:end] <- count_corr[start:end] + 1
+    }
+  }
+  avg_corr <- sum_corr / count_corr
+  avg_corr[count_corr == 0] <- NA
+  return(avg_corr)
+}
+
+# Helper: Compute median correlation per residue based on peptide indices
+get_residue_correlation_median <- function(fasta_seq, peptide_indices) {
+  n <- nchar(fasta_seq)
+  # Create a list to hold correlations for each residue
+  correlation_list <- vector("list", n)
+  
+  # For each peptide, add its target correlation to every residue it covers
+  for (pep in peptide_indices) {
+    start <- as.numeric(pep$start_position)
+    pep_len <- nchar(pep$peptide)
+    end <- start + pep_len - 1
+    if (!is.na(start) && start > 0 && end <= n) {
+      for (pos in start:end) {
+        correlation_list[[pos]] <- c(correlation_list[[pos]], pep$target_correlation)
+      }
+    }
+  }
+  
+  # Compute the median for each residue (if no values, return NA)
+  median_corr <- sapply(correlation_list, function(x) {
+    if (length(x) > 0) median(x, na.rm = TRUE) else NA
+  })
+  
+  return(median_corr)
+}
+
+# Helper: Map numeric correlation values to colors using a continuous palette
+map_correlation_to_color <- function(corr_values, palette = c("red", "gray", "blue"), n_bins = 100) {
+  # Create a vector of colors based on the provided palette
+  palette_colors <- colorRampPalette(palette)(n_bins)
+  # Define breaks assuming correlation values range from -1 to 1
+  breaks <- seq(-1, 1, length.out = n_bins + 1)
+  # Bin each correlation value; if NA, it remains NA
+  bins <- cut(corr_values, breaks = breaks, include.lowest = TRUE)
+  colors <- ifelse(is.na(bins), NA, palette_colors[as.numeric(bins)])
+  return(colors)
+}
+
+alphafold_plot <- function(ioi, genesymb, uniprot_ids, 
+                           peptide_seq_list_file = NULL, 
+                           fasta_file = NULL, 
+                           correlation_palette = c("red", "gray", "blue")) {
+  # Load peptide sequence list for the isoform
+  if (!is.null(peptide_seq_list_file)) {
+    peptide_seq_list <- readRDS(peptide_seq_list_file)
+    peptide_seq_list <- peptide_seq_list[[genesymb]]
+  } else {
+    stop("No peptide membership data provided.")
+  }
+  
+  # Get the AlphaFold structure file using the isoform directly
+  ioi_alphafold <- tryCatch({
+    get_alphafold_file(ioi)
+  }, error = function(e) { 0 })
+  
+  if (!is.list(ioi_alphafold) || is.null(ioi_alphafold[["status_code"]])) {
+    stop("No valid AlphaFold structure file returned for this ID of interest.")
+  }
+  
+  if (ioi_alphafold[["status_code"]] == 404) {
+    stop("No AlphaFold structure was found for this ID of interest.")
+  }
+  
+  # Obtain FASTA sequence: either from file or via AlphaFold retrieval
+  if (!is.null(fasta_file)) {
+    fasta_list <- readRDS(fasta_file)
+    # Assume fasta_list is a named list with ioi as key
+    fasta_seq <- fasta_list[[ioi]]
+  } else {
+    fasta_seq <- get_FASTA_fromalphafold(ioi_alphafold)
+  }
+  
+  # Process peptides to get indices and correlation values
+  peptide_indices <- tryCatch({
+    get_peptide_and_correlation_numeric(fasta_seq, peptide_seq_list)
+  }, error = function(e) { 0 })
+  
+  # If no valid peptide mapping, return a default cartoon representation
+  if (!is.list(peptide_indices)) {
+    p <- NGLVieweR(ioi_alphafold[["content"]]) %>%
+      addRepresentation("cartoon", 
+                        param = list(name = "cartoon", backgroundColor = "white", 
+                                     colorScheme = "uniform", colorValue = "#808080")) %>%
+      stageParameters(backgroundColor = "white", colorValue = "#808080") %>%
+      setQuality("high") %>%
+      setFocus(0) %>%
+      setSpin(TRUE)
+    return(p)
+  }
+  
+  # Compute median correlation per residue and map to colors
+  residue_corr <- get_residue_correlation_median(fasta_seq, peptide_indices)
+  residue_colors <- map_correlation_to_color(residue_corr, palette = correlation_palette)
+  
+  # Start with a base representation of the structure using "tube" style
+  p <- NGLVieweR(ioi_alphafold[["content"]]) %>%
+    addRepresentation("tube", 
+                      param = list(name = "tube", backgroundColor = "white", 
+                                   colorScheme = "uniform", colorValue = "#808080")) %>%
+    stageParameters(backgroundColor = "white", colorValue = "#808080") %>%
+    setQuality("low") %>%
+    setFocus(0) %>%
+    setSpin(TRUE)
+  
+  # Instead of grouping residues, add a surface representation for each residue (disjoint)
+  seq_length <- nchar(fasta_seq)
+  for (pos in 1:seq_length) {
+    col_val <- residue_colors[pos]
+    if (!is.na(col_val)) {
+      # Selection string for a single residue position
+      sele_str <- as.character(pos)
+      p <- tryCatch({
+        p %>% addRepresentation("surface", 
+                                param = list(colorScheme = "uniform",
+                                             colorValue = col_val,
+                                             sele = sele_str,
+                                             opacity = 0.25))
+      }, error = function(e) { p })
+    }
+  }
+  
+  # Clean up temporary AlphaFold file and return the NGL view
+  unlink(ioi_alphafold[["content"]])
+  return(p)
+}
 
 #  _______ _    _ _____  _____ 
 # |__   __| |  | |_   _|/ ____|
@@ -1137,6 +1277,22 @@ h1, h2, h3, h4 {
                       fluidRow(
                         column(12,
                                withSpinner(plotlyOutput("detailed_plot", height = "800px"), type = 4) 
+                        )
+                      )
+             ),
+             
+             tabPanel("Structural",
+                      fluidRow(
+                        column(12,
+                               
+                               span("Alphafold Structural Data", class = "plot-title"),
+                               icon("info-circle", class = "info-icon", id = "alphafold_info")
+                        )
+                      ),
+                      br(),
+                      fluidRow(
+                        column(12,
+                               withSpinner(NGLVieweROutput("NGL_plot"), type = 4) 
                         )
                       )
              ),
@@ -1347,6 +1503,20 @@ server <- function(input, output, session) {
       labs(x = "Mean correlation", y = "Variation") +
       theme(plot.title = element_text(face="bold"), legend.title = element_blank())
   })
+
+    
+  output$NGL_plot <- renderNGLVieweR({
+    req(input$selected_result)
+    req(input$selected_isoforms)
+    req(nrow(working_plasma_dt()) > 0)
+    alphafold_plot(ioi = input$selected_isoforms, 
+                   genesymb = input$selected_result,
+                   uniprot_ids = working_plasma_dt(), 
+                   peptide_seq_list_file = "data/peptide_seq_list.RDS", 
+                   fasta_file = NULL, 
+                   correlation_palette = correlation_palette)
+  })
+
   
   output$detailed_plot <- renderPlotly({
     req(input$selected_result)
