@@ -42,7 +42,59 @@ setkey(plasma_dt, Gene.Name)
 
 color_breaks <- seq(-1, 1, length.out = 100)
 #correlation_palette <- viridis(100, option = "D")  
-correlation_palette <- colorRampPalette(rev(brewer.pal(11, 'Spectral')))(100)
+#correlation_palette <- colorRampPalette(rev(brewer.pal(11, 'Spectral')))(100)
+# correlation_palette_function <- function(x) {
+#   # Ensure x is within the allowed range
+#   x <- pmax(pmin(x, 1), -1)
+#   # For x below the first median, use the first categorical color
+#   if(x <= -0.35) return("grey")
+#   # For x above the last median, use the last categorical color
+#   if(x >= 0.85) return("#206e8c")
+#   
+#   # For values in between, determine which segment to interpolate
+#   if(x < 0.4) {
+#     # Transition from 'No correlation' to 'Weak correlation'
+#     t <- (x - -0.35) / (0.4 - -0.35)
+#     col <- colorRamp(c("grey", "#9ccfe7"))(t)
+#   } else if(x < 0.6) {
+#     # Transition from 'Weak correlation' to 'Moderate correlation'
+#     t <- (x - 0.4) / (0.6 - 0.4)
+#     col <- colorRamp(c("#9ccfe7", "#629db8"))(t)
+#   } else {
+#     # Transition from 'Moderate correlation' to 'Strong correlation'
+#     t <- (x - 0.6) / (0.85 - 0.6)
+#     col <- colorRamp(c("#629db8", "#206e8c"))(t)
+#   }
+#   rgb(col[1], col[2], col[3], maxColorValue = 255)
+# }
+# correlation_palette <- sapply(color_breaks, correlation_palette_function)
+
+correlation_palette_function <- function(x) {
+  x <- pmax(pmin(x, 1), -1)
+  if(x < .3) {
+    rocket_pal <- viridis(100, option = "rocket")
+    idx <- round((x - (-1)) / (.3 - (-1)) * (100 - 51)) + 51
+    return(rocket_pal[idx])
+  } else {
+    # Map x from [0.3, 1] to palette indices [1, 100]
+    idx <- round(100 - (x - .3) / (1 - .3) * 99) + 1
+    return(viridis(100, option = "mako")[idx])
+  }
+}
+
+correlation_palette <- sapply(color_breaks, correlation_palette_function)
+
+color_scale_medians <- c("No correlation" = -0.35,  
+             "Weak correlation" = 0.4, 
+             "Moderate correlation" = 0.6,
+             "Strong correlation" = 0.85)
+
+categorical_colors <- c(
+  "No correlation" = correlation_palette_function(color_scale_medians["No correlation"]),
+  "Weak correlation" = correlation_palette_function(color_scale_medians["Weak correlation"]),
+  "Moderate correlation" = correlation_palette_function(color_scale_medians["Moderate correlation"]),
+  "Strong correlation" = correlation_palette_function(color_scale_medians["Strong correlation"])
+)
 
 my_theme <- bs_theme(
   version = 4,
@@ -781,10 +833,11 @@ jenks_density_plot <- function(ioi, peptide_seq_list_file, uniprot_ids, fasta_fi
     #                              "Weak correlation" = "#F28E4C",  
     #                              "Moderate correlation" = "#E15759", 
     #                              "Strong correlation" = "#F28BBB")) +
-    scale_fill_manual(values = c("No correlation" = "grey",
-                                 "Weak correlation" = "#9ccfe7",  
-                                 "Moderate correlation" = "#629db8", 
-                                 "Strong correlation" = "#206e8c")) +
+    # scale_fill_manual(values = c("No correlation" = "grey",
+    #                              "Weak correlation" = "#9ccfe7",  
+    #                              "Moderate correlation" = "#629db8", 
+    #                              "Strong correlation" = "#206e8c")) +
+    scale_fill_manual(values = categorical_colors) +
     theme_minimal() +
     labs(
       title = paste("Peptide Density by Jenks Class -", ioi),
