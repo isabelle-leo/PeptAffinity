@@ -1293,12 +1293,19 @@ h1, h2, h3, h4 {
                                icon("info-circle", class = "info-icon", id = "alphafold_info")
                         )
                       ),
-                      br(),
+                      fluidRow(
+                        column(12,
+                               div(style = "display: flex; justify-content: center;",
+                                   uiOutput("alphafold_warn")  
+                               )
+                        )
+                      ),
                       fluidRow(
                         column(12,
                                withSpinner(NGLVieweROutput("NGL_plot"), type = 4) 
                         )
                       ),
+
                       br(),
                       fluidRow(
                         column(12,
@@ -1531,17 +1538,23 @@ server <- function(input, output, session) {
         fasta_file = NULL, 
         correlation_palette = correlation_palette
       ),
-      silent = TRUE
+      silent = FALSE
     )
     if (inherits(result, "try-error")) return(NULL)
     result
+    
   })
   
   # Render the NGL plot output
   output$NGL_plot <- renderNGLVieweR({
-    req(ngl_plot_obj())
+    need(ngl_plot_obj(), message = paste("No valid AlphaFold structure file returned for this ID of interest."))
     ngl_plot_obj()
   })
+  output$alphafold_warn <- renderUI({
+    validate(
+      need(ngl_plot_obj(), "No valid AlphaFold structure file returned for this ID of interest.")
+    )
+    NULL  })
   
   # Render the color scale only if the NGL plot is produced.
   output$color_scale <- renderPlot({
