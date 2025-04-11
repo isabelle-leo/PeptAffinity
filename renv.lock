@@ -889,6 +889,37 @@
       "Maintainer": "Martin Maechler <mmaechler+Matrix@gmail.com>",
       "Repository": "CRAN"
     },
+    "NGLVieweR": {
+      "Package": "NGLVieweR",
+      "Version": "1.4.0",
+      "Source": "Repository",
+      "Title": "Interactive 3D Visualization of Molecular Structures",
+      "Authors@R": "c(  person(\"Niels\", \"van der Velden\", role = c(\"aut\", \"cre\"), email = \"n.s.j.vandervelden@gmail.com\"), person(\"Alexander\", \"Rose\", role = \"cph\", comment = 'NGL.js library'))",
+      "Maintainer": "Niels van der Velden <n.s.j.vandervelden@gmail.com>",
+      "Description": "Provides an 'htmlwidgets' <https://www.htmlwidgets.org/> interface to 'NGL.js' <http://nglviewer.org/ngl/api/>. 'NGLvieweR' can be used to visualize and interact with protein databank ('PDB') and structural files in R and Shiny applications. It includes a set of API functions to manipulate the viewer after creation in Shiny.",
+      "License": "MIT + file LICENSE",
+      "Encoding": "UTF-8",
+      "RoxygenNote": "7.3.2",
+      "Imports": [
+        "htmlwidgets",
+        "magrittr",
+        "tools",
+        "shiny"
+      ],
+      "Suggests": [
+        "knitr",
+        "webshot",
+        "markdown",
+        "rmarkdown",
+        "colourpicker"
+      ],
+      "VignetteBuilder": "knitr",
+      "URL": "https://github.com/nvelden/NGLVieweR",
+      "BugReports": "https://github.com/nvelden/NGLVieweR/issues",
+      "NeedsCompilation": "no",
+      "Author": "Niels van der Velden [aut, cre], Alexander Rose [cph] (NGL.js library)",
+      "Repository": "CRAN"
+    },
     "R.methodsS3": {
       "Package": "R.methodsS3",
       "Version": "1.8.2",
