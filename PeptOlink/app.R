@@ -1234,6 +1234,7 @@ ui <- fluidPage(
     tags$link(rel = "stylesheet", href = "https://fonts.googleapis.com/css2?family=Fascinate+Inline&display=swap"),
     tags$link(rel = "icon", type = "image/png", href = "icon.png")
     ),
+  tags$script(HTML("$(function(){ $('[data-toggle=\"tooltip\"]').tooltip(); });")),
   tags$style(HTML("
 h1, h2, h3, h4 {
       font-family: 'Fascinate Inline', cursive;
@@ -1309,7 +1310,9 @@ h1, h2, h3, h4 {
                       fluidRow(
                         column(12,
                                span("Isoform-specific Data", class = "plot-title"),
-                               icon("info-circle", class = "info-icon", id = "detailed_info")
+                               icon("info-circle", class = "info-icon", id = "detailed_info",
+                                    title = "Here, we show the selected isoform with domains from the interpro database and correlations of all peptides. Peptides which cover the same mapping on the primary sequence are separated into multiple rows.",
+                                    `data-toggle` = "tooltip")
                         )
                       ),
                       br(),
@@ -1325,7 +1328,9 @@ h1, h2, h3, h4 {
                         column(12,
                                
                                span("Alphafold Structural Data", class = "plot-title"),
-                               icon("info-circle", class = "info-icon", id = "alphafold_info")
+                               icon("info-circle", class = "info-icon", id = "alphafold_info",
+                                    title = "This plot shows median correlation to a paired olink assay for peptides, visualized across the structural layout of the protein. The protein data matches the uniprot accession isoform. The 3D model was created using alphafold (obtained from https://alphafold.ebi.ac.uk/ which has a CC BY 4.0 license). Colored 3D structures represent detected peptides from the mass spec data, while a grey chain backbone represents the entire protein. The results do not imply separate structural entities, they simply represent median correlations and the mapping of these values.",
+                                    `data-toggle` = "tooltip")
                         )
                       ),
                       fluidRow(
@@ -1357,7 +1362,9 @@ h1, h2, h3, h4 {
                       fluidRow(
                         column(12,
                                span("Summary of Filtered Results", class = "plot-title"),
-                               icon("info-circle", class = "info-icon", id = "summary_info")
+                               icon("info-circle", class = "info-icon", id = "summary_info",
+                                    title = "These results cover the whole dataset, you can use them to understand the general peptide properties for gene symbols in the data and can guide your filter selections for detailed explorations.",
+                                    `data-toggle` = "tooltip")
                         )
                       ),
                       br(),
