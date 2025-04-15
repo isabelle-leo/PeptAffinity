@@ -100,6 +100,9 @@ categorical_colors <- c(
   "Strong correlation" = correlation_palette_function(color_scale_medians["Strong correlation"])
 )
 
+# For summary scatter plots
+mako_colors <- mako(5)
+
 my_theme <- bs_theme(
   version = 4,
   bootswatch = "flatly",
@@ -1247,12 +1250,16 @@ h1, h2, h3, h4 {
                  circle = FALSE,
                  inline = TRUE,
                  
-                 numericInput("var_corr", "Correlation variance ≥", 
-                              value = 0, max = 1, min = 0, step = .01),
                  numericInput("mean_corr", "Mean correlation ≤", 
                               value = 1, max = 1, min = -1, step = .01),
+                 numericInput("sd_corr", "Correlation SD ≥", 
+                              value = 0, max = 1, min = 0, step = .01),
+                 numericInput("median_corr", "Median correlation ≤",
+                              value = 1, max = 1, min = -1, step = .01),
+                 numericInput("iqr_corr", "Correlation IQR ≥",
+                              value = 0, max = 1, min = 0, step = .01),
                  numericInput("n_peptides", "Number of peptides ≥", 
-                              value = 10, max = 500, min = 1, step = 5),
+                              value = 5, max = 500, min = 1, step = 5),
                  numericInput("n_isoforms", "Number of isoforms ≥", 
                               value = 1, max = 4, min = 1, step = 1),
                  actionBttn("clear_filters", "Clear", icon = icon("times"), style = "unite", size = "xs")
@@ -1327,8 +1334,14 @@ h1, h2, h3, h4 {
                       ),
                       br(),
                       fluidRow(
-                        column(6, withSpinner(plotOutput("summary_plot", height = "300px"), type = 4)),
-                        column(6, withSpinner(plotOutput("volcano_plot", height = "300px"), type = 4))
+                        column(12, withSpinner(plotOutput("summary_plot", height = "300px"), type = 4))
+                      ),
+                      
+                      br(),
+                      
+                      fluidRow(
+                        column(6, withSpinner(plotlyOutput("volcano_plot", height = "300px"), type = 4)),
+                        column(6, withSpinner(plotlyOutput("volcano_plot2", height = "300px"), type = 4))
                       )
              )
            )
@@ -1346,19 +1359,33 @@ server <- function(input, output, session) {
     group_by(gene_symbol) %>%
     summarise(
       mean_corr = mean(correlation, na.rm = TRUE),
-      var_corr = var(correlation, na.rm = TRUE),
+      sd_corr = sd(correlation, na.rm = TRUE),
+      median_corr = median(correlation, na.rm = TRUE),
+      iqr_corr = IQR(correlation, na.rm = TRUE),
       n_peptides = n(),
       n_isoforms = length(unique(unlist(strsplit(paste(UniProt.MS, collapse = ";"), ";"))))
     )
   
   
   filtered_data <- reactive({
-    req(input$var_corr, input$mean_corr, input$n_peptides, input$n_isoforms)  # Ensure the correct inputs are available
     
+    # Ensure the correct inputs are available
+    req(
+      input$sd_corr,
+      input$mean_corr,
+      input$median_corr,
+      input$iqr_corr,
+      input$n_peptides,
+      input$n_isoforms
+    ) 
+    
+    # Filter genes based on user inputs
     filtered_genes <- gene_stats %>%
       filter(
-        var_corr >= input$var_corr,
+        sd_corr >= input$sd_corr,
         mean_corr <= input$mean_corr,
+        median_corr <= input$median_corr,
+        iqr_corr >= input$iqr_corr,
         n_peptides >= input$n_peptides,
         n_isoforms >= input$n_isoforms
       ) %>%
@@ -1418,8 +1445,10 @@ server <- function(input, output, session) {
     
     # Reset thresholds
     # Goal: Show everything
-    updateNumericInput(session, "var_corr", value = 0)
+    updateNumericInput(session, "sd_corr", value = 0)
     updateNumericInput(session, "mean_corr", value = 1)
+    updateNumericInput(session, "median_corr", value = 1)
+    updateNumericInput(session, "iqr_corr", value = 0)
     updateNumericInput(session, "n_peptides", value = 1)
     updateNumericInput(session, "n_isoforms", value = 1)
    
@@ -1501,27 +1530,69 @@ server <- function(input, output, session) {
   output$summary_plot <- renderPlot({
     fd <- filtered_data()
     req(fd)
-    fd_sampled <- fd %>% sample_n(min(nrow(fd), 5000))
     
-    fd_sampled <- fd_sampled %>% mutate(jenks_class = cor_intervals(correlation))
-    ggviolin(fd_sampled, x = "jenks_class", y = "correlation", color = "jenks_class", 
-             add = "jitter", palette = "jco") +
-      labs(x = "Classification", y = "Correlation") +
-      theme(plot.title = element_text(face="bold"))
+    ggplot(fd, aes(x = correlation, y = jenks_class, color = jenks_class)) +
+      geom_violin(alpha = 0.5) +
+      geom_jitter(height = 0.3, alpha = 0.7) +
+      scale_color_manual(values = categorical_colors) +
+      labs(x = "Peptide-Olink correlation", y = "Correlation category",
+           title = "Peptide-Olink correlations by category") +
+      theme_classic2() +
+      theme(legend.position = 'none',
+            text = element_text(size = 14, family = "Open Sans"),    
+            axis.title = element_text(size = 16),
+            axis.text = element_text(size = 13),
+            plot.title = element_text(size = 18)
+    )
+    
+  })
+
+  output$volcano_plot <- renderPlotly({
+    fd <-  gene_stats %>% filter(!is.na(sd_corr), gene_symbol %in% filtered_data()$gene_symbol)
+    req(fd)
+    
+    p <- ggplot(fd, aes(
+      x = mean_corr,
+      y = sd_corr,
+      size = n_peptides,
+      text = paste("Gene:", gene_symbol,
+                   "<br>Mean Corr:", round(mean_corr, 2),
+                   "<br>SD:", round(sd_corr, 2),
+                   "<br>Peptides:", n_peptides)
+    )) +
+      geom_point(alpha = 0.8, fill = "#77D9C7", shape = 21, stroke = 0.2, color = 'grey40') +
+      labs(x = "Mean correlation", y = "SD", title = "Mean vs. SD") +
+      theme_classic2() +
+      theme(plot.title = element_text(face = "bold"),
+            legend.title = element_blank())
+    
+    ggplotly(p, tooltip = "text")
+    
   })
   
-  output$volcano_plot <- renderPlot({
-    fd <-  gene_stats %>% filter(!is.na(var_corr))
+  output$volcano_plot2 <- renderPlotly({
+    fd <-  gene_stats %>% filter(!is.na(iqr_corr), gene_symbol %in% filtered_data()$gene_symbol)
     req(fd)
-    fd_sampled <- fd %>% sample_n(min(nrow(fd), 5000))
     
+    p <- ggplot(fd, aes(
+      x = median_corr,
+      y = iqr_corr,
+      size = n_peptides,
+      text = paste("Gene:", gene_symbol,
+                   "<br>Median Corr:", round(median_corr, 2),
+                   "<br>IQR:", round(iqr_corr, 2),
+                   "<br>Peptides:", n_peptides)
+    )) +
+      geom_point(alpha = 0.8, fill = "#77D9C7", shape = 21, stroke = 0.2, color = 'grey40') +
+      labs(x = "Median correlation", y = "IQR", title = "Median vs. IQR") +
+      theme_classic2() +
+      theme(plot.title = element_text(face = "bold"),
+            legend.title = element_blank())
     
-    ggplot(fd_sampled, aes(x = mean_corr, y = var_corr, size = n_peptides)) +
-      geom_point(alpha=0.7) +
-      scale_color_manual(values = c("grey60", "#E15759")) +
-      labs(x = "Mean correlation", y = "Variation") +
-      theme(plot.title = element_text(face="bold"), legend.title = element_blank())
+    ggplotly(p, tooltip = "text")
+    
   })
+  
 
     
   # Check for the plot being possible using a reactive
