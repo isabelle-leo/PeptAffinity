@@ -23,6 +23,7 @@ library(purrr)
 library(plotly)
 library(RColorBrewer)
 library(NGLVieweR)
+library(colorspace)
 
 #   _____ ______ _______ _    _ _____  
 #  / ____|  ____|__   __| |  | |  __ \ 
@@ -85,6 +86,40 @@ correlation_palette_function <- function(x) {
     return(viridis(100, option = "mako")[idx])
   }
 }
+
+# correlation_palette_function <- (function(){
+#   # Define anchors
+#   ax <- c(1, 0.7, 0.4, 0.3, 0, -0.3, -0.5, -0.7, -1)
+#   ah <- c( "#0B0405FF","#e60045", "#ff80a6", "#ffb3c9","#ffe6ed",
+#           "#DEF5E5FF",  "#A0DFB9FF", "#38AAACFF","#357BA2FF")
+#   
+#   # Convert anchor hex codes to an RGB matrix (each row = one color in [0,1])
+#   rgb_mat <- t(col2rgb(ah)) / 255
+#   
+#   # Convert from sRGB to Lab
+#   lab_mat <- convertColor(rgb_mat, from = "sRGB", to = "Lab", scale.in = 1)
+#   
+#   # Create natural spline functions for Lab channels L, a, and b
+#   Lfun <- splinefun(ax, lab_mat[, 1], method = "natural")
+#   afun <- splinefun(ax, lab_mat[, 2], method = "natural")
+#   bfun <- splinefun(ax, lab_mat[, 3], method = "natural")
+#   
+#   # Return the palette function mapping a value x in [-1,1] to a hex color.
+#   function(x) {
+#     x_clamped <- pmax(pmin(x, 1), -1)
+#     L_val <- Lfun(x_clamped)
+#     a_val <- afun(x_clamped)
+#     b_val <- bfun(x_clamped)
+#     # Combine into a matrix where each row is a color in Lab space.
+#     lab_interpolated <- cbind(L_val, a_val, b_val)
+#     # Convert back to sRGB with clip = TRUE (by default, convertColor clips out-of-range values).
+#     rgb_interpolated <- convertColor(lab_interpolated, from = "Lab", to = "sRGB", scale.out = 1)
+#     # For vectorized input, convert each row to a hex code.
+#     apply(rgb_interpolated, 1, function(row) {
+#       rgb(row[1], row[2], row[3])
+#     })
+#   }
+# })()
 
 correlation_palette <- sapply(color_breaks, correlation_palette_function)
 
