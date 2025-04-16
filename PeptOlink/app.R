@@ -1314,7 +1314,7 @@ h1, h2, h3, h4 {
     }
       .nav-tabs + .tab-content {
       background-color: #fff;
-      padding: 15px; /* optional, for spacing */
+      padding: 15px; /* for spacing */
       }
     .nav-tabs .nav-item .nav-link.active {
       background-color: #FEEEEB;
@@ -1334,6 +1334,47 @@ h1, h2, h3, h4 {
     .sidebar-section {
       margin-bottom: 15px;
     }
+.domain-toggle {
+  display: flex; 
+  justify-content: flex-start; /* left-align the row */
+  margin-bottom: 10px;
+}
+
+.domain-toggle .btn-group {
+  display: flex;
+  gap: 5px; /* space between buttons */
+}
+
+.domain-toggle .btn {
+  background-color: #F4EDFA !important; /* Pastel purple normal */
+  color: #333 !important;
+  border: 1px solid #D3B8ED !important;
+  transition: transform 0.2s ease-in-out;
+  font-weight: 500;
+}
+
+/* Hover effect */
+.domain-toggle .btn:hover {
+  background-color: #E2D3F1 !important; /* Slightly darker pastel purple on hover */
+  transform: scale(1.04);               /* Subtle zoom */
+  box-shadow: 0 0 3px #E2D3F1;          /* Soft glow ring */
+}
+
+/* Active button (radioGroupButtons uses .btn-group-toggle + .btn.active) */
+.domain-toggle .btn-group-toggle .btn.active {
+  background-color: #4F0433 !important; /* Deeper purple to indicate selected */
+  color: #fff !important;
+  box-shadow: 0 0 0 2px #CDB1E8;        /* Outline ring */
+}
+
+/* Also handle :focus or :active states for the moment of click */
+.domain-toggle .btn:focus,
+.domain-toggle .btn:active {
+  outline: none;
+  box-shadow: 0 0 0 2px #CDB1E8; 
+}
+
+
   ")),
   titlePanel(
     "PeptOlink",
@@ -1385,6 +1426,22 @@ h1, h2, h3, h4 {
                                icon("info-circle", class = "info-icon", id = "detailed_info",
                                     title = "Here, we show the selected isoform with domains from the interpro database and correlations of all peptides. Peptides which cover the same mapping on the primary sequence are separated into multiple rows.",
                                     `data-toggle` = "tooltip")
+                        )
+                      ),
+                      #br(),
+                      fluidRow(
+                        column(12,
+                               div(
+                                 class = "domain-toggle",
+                                 radioGroupButtons(
+                                   inputId = "domain_source",
+                                   label = "Domain Source:",
+                                   choices = c("InterPro", "Prosite"),
+                                   selected = "InterPro",
+                                   justified = TRUE,
+                                   size = "sm"
+                                 )
+                               )
                         )
                       ),
                       br(),
@@ -1744,6 +1801,7 @@ server <- function(input, output, session) {
   
   output$detailed_plot <- renderPlotly({
     req(input$selected_result)
+    req(input$domain_source)
     req(input$selected_isoforms)
     req(nrow(working_plasma_dt()) > 0)
     # # Use a reactive expression for selected_plasma_data
@@ -1759,9 +1817,16 @@ server <- function(input, output, session) {
     #)
     
     # Call the combined plot function
+    
+    domain_file <- if (input$domain_source == "InterPro") {
+      "data/interpro_domains.RDS"
+    } else {
+      "data/prosite_motifs.RDS"
+    }
+    
     combined_interpro_density_plot(
       ioi = input$selected_result,
-      interpro_file = "data/interpro_domains.RDS",
+      interpro_file = domain_file,
       interpro_ioi_sele = input$selected_isoforms,
       uniprot_ids = working_plasma_dt(),  
       peptide_seq_list_file = "data/peptide_seq_list.RDS",
