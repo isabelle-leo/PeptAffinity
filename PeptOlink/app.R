@@ -936,7 +936,7 @@ alphafold_plot <- function(ioi, genesymb, uniprot_ids,
     stageParameters(backgroundColor = "white", colorValue = "#808080", tooltip = FALSE) %>%
     setQuality("low") %>%
     setFocus(0) %>%
-    setSpin(TRUE)
+    setSpin(FALSE) #They will have to just click and spin it, otherwise it's too hard to read
   
   #make a spot for corr data
   p$x$corrData <- residue_corr
@@ -1050,6 +1050,10 @@ h1, h2, h3, h4 {
     .sidebar-section {
       margin-bottom: 15px;
     }
+    /* Make sure the shinyWidgets dropdown sits above the NGL tooltip */
+.btn-group.shinyWidgets-dropdown .dropdown-menu {
+z-index: 999999 !important;
+}
 .domain-toggle {
   display: flex; 
   justify-content: flex-start; /* left-align the row */
@@ -1580,13 +1584,21 @@ let corrVal = corrData[residueIndex];
 // Build the label
 let label = atom.qualifiedName();
 if (typeof corrVal === 'number' && isFinite(corrVal)) {
-label += ', Corr: ' + corrVal.toFixed(3);
+label += ', Median correlation: ' + corrVal.toFixed(3);
 }
 
-tip.style.left = (cp.x + 8) + 'px';
-tip.style.top  = (cp.y + 8) + 'px';
 tip.innerHTML  = label;
 tip.style.display = 'block';
+
+// Needs an adjustment because relative to the container/pageg y is reversed
+const container = stage.viewer.container;
+if (getComputedStyle(container).position === 'static') {
+  container.style.position = 'relative';   // becomes the “nearest positioned ancestor”
+}
+
+const y = container.clientHeight - cp.y;   // flip Y
+tip.style.left =  (cp.x + 8) + 'px';
+tip.style.top  =  (y + 8) + 'px';
 });
   }
   "
