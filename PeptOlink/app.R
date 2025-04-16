@@ -944,6 +944,9 @@ alphafold_plot <- function(ioi, genesymb, uniprot_ids,
   # Instead of grouping residues, add a surface representation for each residue (disjoint)
   seq_length <- nchar(fasta_seq)
   for (pos in 1:seq_length) {
+  valid_pos     <- which(!is.na(residue_colors))
+  expected_all  <- length(valid_pos)
+  for (pos in valid_pos) {
     col_val <- residue_colors[pos]
     if (!is.na(col_val)) {
       # Selection string for a single residue position
@@ -954,10 +957,15 @@ alphafold_plot <- function(ioi, genesymb, uniprot_ids,
                                              colorValue = col_val,
                                              sele = sele_str,
                                              opacity = 0.25))
-      }, error = function(e) { p })
+      }, error = function(e) {
+        errors <<- errors + 1
+        p
+      })
     }
   }
   
+  #Add a counter for the plot loading animation
+  p$x$surfaceCount <- expected_all - errors
 
   # Clean up temporary AlphaFold file and return the plot ( + bonus data for rendering)
   unlink(ioi_alphafold[["content"]])
@@ -1270,7 +1278,32 @@ z-index: 999999 !important;
                       ),
                       fluidRow(
                         column(12,
-                               withSpinner(NGLVieweROutput("NGL_plot"), type = 4) 
+                               withSpinner(div(
+                                 id = "ngl-container", 
+                                 style = "position:relative;",
+                                 
+                                 # your NGL widget
+                                 NGLVieweROutput("NGL_plot", width="100%", height="600px"),
+                                 
+                                 # overlay spinner
+                                 div(
+                                   id    = "ngl-loading",
+                                   style = "
+      position:absolute;
+      top:0; left:0;
+      width:100%; height:100%;
+      background:rgba(255,255,255,0.8);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      z-index:1000;
+    ",
+                                   # bootstrap spinner (any size you like)
+                                   div(class="spinner-border text-primary", role="status",
+                                       span(class="sr-only","Loading…")
+                                   )
+                                 )
+                               ), type = 4) 
                         )
                       ),
 
@@ -1551,14 +1584,58 @@ server <- function(input, output, session) {
     htmlwidgets::onRender(
       x = ngl_plot_obj(),
       jsCode = "function(el, x) {
-// Retrieve the Stage by:
-var stage = this.getStage();
-if (!stage) {
+      // Troubleshooting helpers below
+      var stage = this.getStage();
+      if (!stage) {
 console.error('No NGL Stage found via this.getStage()');
 return;
-}
+} 
+  console.log('🏗  NGL Stage loaded:', stage);
 
-    // Turn off the built-in tooltip if you wish
+  // 1) List every signal name
+  console.log('🔔 Available signals:', Object.keys(stage.signals));
+
+  // 2) Attach a one‑size‑fits‑all logger
+  Object.entries(stage.signals).forEach(function([name, sig]) {
+    if (sig && typeof sig.add === 'function') {
+      sig.add(function() {
+        console.log('📣 Signal fired:', name);
+      });
+    }
+  });
+
+  // 3) Dump component(s) and their reprList
+  var compList = stage.compList;
+  console.log('🧩 Components:', compList);
+  compList.forEach(function(comp, ci) {
+    console.log('  ↳ Component', ci, 'methods:', Object.keys(comp));
+    console.log('     reprList:', comp.reprList);
+    comp.reprList.forEach(function(rep, ri) {
+      console.log('     ↳ repr[' + ri + ']:', rep, 'prototype:', Object.getPrototypeOf(rep));
+    });
+  });
+
+
+// Call to the overlay spinner
+  var spinner   = el.parentNode.querySelector('#ngl-loading');
+  if (spinner) spinner.style.display = 'flex';
+
+
+  // The part that looks for surfaces to be rendered
+  var stage = this.getStage();
+  if(stage) {
+    var iv = setInterval(function() {
+    if (stage.tasks.count === 0) {
+      spinner.style.display = 'none';
+      clearInterval(iv);
+    }
+  }, 100);
+  } else {
+    // fallback: if stage isn't even available, just hide
+    if (spinner) spinner.style.display = 'none';
+  }
+  
+    // Turn off the built-in tooltip
     stage.setParameters({tooltip: false});
 
     // Create a custom tooltip
@@ -1592,7 +1669,7 @@ return;
 let atom = pickingProxy.atom;
 let cp = pickingProxy.canvasPosition;
 
-// If residue mapping is 0-based, so use resno - 1:
+// residue mapping is 0-based, so use resno - 1:
 let residueIndex = atom.resno - 1;
 let corrVal = corrData[residueIndex];
 
