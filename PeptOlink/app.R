@@ -341,14 +341,21 @@ compute_jenks_clusters <- function(data, value_column = "correlation", n_classes
   return(data)
 }
 
-interpro_plot <- function(ioi, interpro_file, uniprot_ids, peptide_seq_list_file = NULL, fasta_file = NULL, abundance_file = NULL, abundance_column = "quant",
+interpro_plot <- function(ioi, interpro_ioi_sele = NULL, interpro_file, uniprot_ids, peptide_seq_list_file = NULL, fasta_file = NULL, abundance_file = NULL, abundance_column = "quant",
                           correlation_palette = c("red", "gray", "blue"), 
                           interpro_colors = c("#FF5376", "#72AFD9", "#E3D26F", "#A288E3", "#1B5299", "#68D8D6", "#B78DA3")) {
   
   interpro_ioi <- readRDS(interpro_file)
-  interpro_ioi <- interpro_ioi[interpro_ioi$hgnc_symbol == ioi & 
+  if(!is.null(interpro_ioi_sele)){
+    
+    interpro_ioi <- interpro_ioi[interpro_ioi$uniprotswissprot == interpro_ioi_sele & 
+                                   !is.null(interpro_ioi$interpro_description) & 
+                                   !is.na(interpro_ioi$interpro_description),]
+    
+  }else {interpro_ioi <- interpro_ioi[interpro_ioi$hgnc_symbol == ioi & 
                                  !is.null(interpro_ioi$interpro_description) & 
                                  !is.na(interpro_ioi$interpro_description),]
+  }
   
   ioi_alphafold <- tryCatch({get_alphafold_file(ioi, uniprot_ids)},
                             error = function(e){0})
@@ -369,8 +376,11 @@ interpro_plot <- function(ioi, interpro_file, uniprot_ids, peptide_seq_list_file
   peptide_indices <- tryCatch({get_peptide_and_correlation_numeric(fasta_list, peptide_seq_list)},
                               error = function(e){0})
   
-  interpro_options <- unique(interpro_ioi$interpro_description)
-  
+  interpro_options <- character(0)
+  if (nrow(interpro_ioi) > 0) {
+    interpro_options <- unique(interpro_ioi$interpro_description)
+  }
+
   # Initialize meta_hmap with two columns: Amino acid residue, Olink target correlation
   meta_hmap <- matrix(nrow = nchar(fasta_list[[1]]), ncol = 2)
   colnames(meta_hmap) <- c("Amino acid residue", "Olink target correlation")
@@ -431,7 +441,7 @@ interpro_plot <- function(ioi, interpro_file, uniprot_ids, peptide_seq_list_file
   meta_hmap <- as.data.frame(meta_hmap, stringsAsFactors = FALSE)
   
   # Add domain columns
-  for(domain in interpro_options) {
+  if(nrow(interpro_ioi) > 0){for(domain in interpro_options) {
     meta_hmap[, domain] <- NA
   }
   
@@ -445,7 +455,7 @@ interpro_plot <- function(ioi, interpro_file, uniprot_ids, peptide_seq_list_file
       }
     }
   }
-  
+  }
   # We now have: 
   # "Amino acid residue", "Olink target correlation", maybe more "Correlation X" columns, and domain columns.
   
@@ -458,8 +468,10 @@ interpro_plot <- function(ioi, interpro_file, uniprot_ids, peptide_seq_list_file
   rownames(cor_mat) <- meta_hmap[,"Amino acid residue"]
   
   # Determine domain feature category per residue
-  domain_matrix <- meta_hmap[,interpro_options, drop=FALSE]
+  if(nrow(interpro_ioi) > 0){domain_matrix <- meta_hmap[,interpro_options, drop=FALSE]
   domains_per_res <- apply(domain_matrix, 1, function(x) sum(!is.na(x)))
+  } else{
+  domains_per_res <- rep(0, nrow(meta_hmap))}
   
   feature_category <- character(nrow(meta_hmap))
   for (r in seq_len(nrow(meta_hmap))) {
@@ -510,7 +522,7 @@ interpro_plot <- function(ioi, interpro_file, uniprot_ids, peptide_seq_list_file
   # Already set scale -1 to 1:
   color_breaks <- seq(-1, 1, length.out = 100)
   correlation_palette <- colorRampPalette(correlation_palette)(100)
-  
+  if(nrow(interpro_ioi) > 0){
   #Substitute the domains for a "no feature" annotation instead of NA
   domain_matrix<- domain_matrix %>%
     #mutate(across(everything(), ~ ifelse(!is.na(.), "Feature", .))) %>%
@@ -528,10 +540,12 @@ interpro_plot <- function(ioi, interpro_file, uniprot_ids, peptide_seq_list_file
     cat_color_mapping[[i]] <- domain_colors[i]
     names(cat_color_mapping[[i]]) <- all_categories[i]
   }
-  
+  }
   
   # Total plot height
-  domain_height <- (ncol(domain_matrix) + 1) * 30
+  if(nrow(interpro_ioi) > 0){
+    domain_height <- (ncol(domain_matrix) + 1) * 30
+    } else(domain_height <- 30)
   peptide_height <- (ncol(cor_mat) + 1) * 40
   total_height <- domain_height + peptide_height
   # Proportional heights for subplots
@@ -544,7 +558,7 @@ interpro_plot <- function(ioi, interpro_file, uniprot_ids, peptide_seq_list_file
   # Min height of 300
   total_height <- max(total_height, 400)
   
-  heatmap <- heatmaply(
+  if(nrow(interpro_ioi) > 0){heatmap <- heatmaply(
     t(data.matrix(cor_mat)),
     #main = paste("InterPro Domain & Correlation -", ioi),
     scale = "none",
@@ -575,7 +589,37 @@ interpro_plot <- function(ioi, interpro_file, uniprot_ids, peptide_seq_list_file
       thickness = 15,
       yref = 'paper'
     )
-  
+  }else {heatmap <- heatmaply(
+    t(data.matrix(cor_mat)),
+    #main = paste("InterPro Domain & Correlation -", ioi),
+    scale = "none",
+    limits = c(-1,1),
+    showticklabels = c(TRUE, FALSE),
+    colors = correlation_palette,
+    #ColSideColors = domain_matrix, 
+    colv = F,
+    Rowv = F,
+    plot_method ='plotly',
+    #col_side_palette = colorRampPalette(brewer.pal(9, 'PuBuGn')[2:8]), # not working at the moment, works if you don't use "plotly" but then rest is broken
+    hoverinfo = "text",
+    subplot_heights = c(peptide_height),
+    height = total_height,
+    custom_hovertext = t(hover_text), # for hover
+    dendrogram = "none"
+  ) %>%
+    colorbar(
+      title = "MS-Olink correlation", 
+      titlefont = list(size = 10), 
+      tickfont = list(size = 8),
+      which = 2,
+      x = 1,
+      y = 0,
+      len = 100,
+      lenmode = 'pixels',
+      yanchor = 'bottom',
+      thickness = 15,
+      yref = 'paper'
+    )}
   # Remove colorbar and legend for domain plot
   heatmap$x$data[[1]]$showscale <- FALSE
   
@@ -892,7 +936,7 @@ jenks_density_plot <- function(ioi, peptide_seq_list_file, uniprot_ids, fasta_fi
 
 
 # Combined Plot Function
-combined_interpro_density_plot <- function(ioi, interpro_file, uniprot_ids, 
+combined_interpro_density_plot <- function(ioi, interpro_file, uniprot_ids, interpro_ioi_sele = NULL,
                                            peptide_seq_list_file = NULL, fasta_file = NULL, 
                                            abundance_file = NULL, abundance_column = "quant",
                                            correlation_palette = c("red", "gray", "blue"), 
@@ -900,7 +944,17 @@ combined_interpro_density_plot <- function(ioi, interpro_file, uniprot_ids,
                                                                "#A288E3", "#1B5299", "#68D8D6", "#B78DA3")) {
   
   # Generate the Heatmaply Plot
-  heatmap_plot <- interpro_plot(
+  if(!is.null( interpro_ioi_sele)){heatmap_plot <- interpro_plot(
+    ioi = ioi,
+    interpro_file = interpro_file,
+    interpro_ioi_sele = interpro_ioi_sele,
+    uniprot_ids = uniprot_ids,
+    peptide_seq_list_file = peptide_seq_list_file,
+    fasta_file = fasta_file,
+    abundance_file = abundance_file,
+    abundance_column = abundance_column,
+    correlation_palette = correlation_palette,
+    interpro_colors = interpro_colors)} else{heatmap_plot <- interpro_plot(
     ioi = ioi,
     interpro_file = interpro_file,
     uniprot_ids = uniprot_ids,
@@ -911,6 +965,7 @@ combined_interpro_density_plot <- function(ioi, interpro_file, uniprot_ids,
     correlation_palette = correlation_palette,
     interpro_colors = interpro_colors
   )
+  }
   
   # Generate the Density Plot using ggplot2
   density_plot_gg <- jenks_density_plot(
@@ -1697,6 +1752,7 @@ server <- function(input, output, session) {
     combined_interpro_density_plot(
       ioi = input$selected_result,
       interpro_file = "data/interpro_domains.RDS",
+      interpro_ioi_sele = input$selected_isoforms,
       uniprot_ids = working_plasma_dt(),  
       peptide_seq_list_file = "data/peptide_seq_list.RDS",
       fasta_file = working_plasma_dt(),
