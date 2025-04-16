@@ -975,6 +975,17 @@ color_scale_plot <- function(correlation_palette, n_bins = 100) {
     scale_x_continuous(breaks = seq(-1, 1, by = 0.5), expand = c(0, 0)) +
     scale_y_continuous(breaks = NULL, expand = c(0, 0)) +
     theme_minimal(base_family = "Open Sans") +
+    theme(
+      text = element_text(color = "#4F0433", size = 20),
+      axis.text = element_text(color = "#4F0433", size = 20),
+      axis.title = element_text(color = "#4F0433", size = 20),
+      plot.title = element_text(color = "#4F0433", size = 20),
+      plot.subtitle = element_text(color = "#4F0433", size = 20),
+      plot.caption = element_text(color = "#4F0433", size = 20),
+      legend.text = element_text(color = "#4F0433", size = 20),
+      legend.title = element_text(color = "#4F0433", size = 20),
+      strip.text = element_text(color = "#4F0433", size = 20)  # for facets
+    )+
     theme(axis.title.y = element_blank(),
           axis.text.y  = element_blank(),
           axis.ticks.y = element_blank(),
