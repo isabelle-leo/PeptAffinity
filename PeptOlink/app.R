@@ -348,13 +348,13 @@ interpro_plot <- function(ioi, interpro_ioi_sele = NULL, interpro_file, uniprot_
   interpro_ioi <- readRDS(interpro_file)
   if(!is.null(interpro_ioi_sele)){
     
-    interpro_ioi <- interpro_ioi[interpro_ioi$uniprotswissprot == interpro_ioi_sele & 
-                                   !is.null(interpro_ioi$interpro_description) & 
-                                   !is.na(interpro_ioi$interpro_description),]
+    interpro_ioi <- interpro_ioi[interpro_ioi$uniprot == interpro_ioi_sele & 
+                                   !is.null(interpro_ioi$description) & 
+                                   !is.na(interpro_ioi$description),]
     
   }else {interpro_ioi <- interpro_ioi[interpro_ioi$hgnc_symbol == ioi & 
-                                 !is.null(interpro_ioi$interpro_description) & 
-                                 !is.na(interpro_ioi$interpro_description),]
+                                 !is.null(interpro_ioi$description) & 
+                                 !is.na(interpro_ioi$description),]
   }
   
   ioi_alphafold <- tryCatch({get_alphafold_file(ioi, uniprot_ids)},
@@ -378,7 +378,7 @@ interpro_plot <- function(ioi, interpro_ioi_sele = NULL, interpro_file, uniprot_
   
   interpro_options <- character(0)
   if (nrow(interpro_ioi) > 0) {
-    interpro_options <- unique(interpro_ioi$interpro_description)
+    interpro_options <- unique(interpro_ioi$description)
   }
 
   # Initialize meta_hmap with two columns: Amino acid residue, Olink target correlation
@@ -449,8 +449,8 @@ interpro_plot <- function(ioi, interpro_ioi_sele = NULL, interpro_file, uniprot_
   for(i in meta_hmap[,'Amino acid residue']) {
     aa_idx <- which(meta_hmap[,'Amino acid residue'] == i)
     for(j in seq_len(nrow(interpro_ioi))) {
-      if(i >= interpro_ioi$interpro_start[j] & i <= interpro_ioi$interpro_end[j]) {
-        dname <- interpro_ioi$interpro_description[j]
+      if(i >= interpro_ioi$start[j] & i <= interpro_ioi$end[j]) {
+        dname <- interpro_ioi$description[j]
         meta_hmap[aa_idx, dname] <- dname
       }
     }
@@ -471,14 +471,17 @@ interpro_plot <- function(ioi, interpro_ioi_sele = NULL, interpro_file, uniprot_
   if(nrow(interpro_ioi) > 0){domain_matrix <- meta_hmap[,interpro_options, drop=FALSE]
   domains_per_res <- apply(domain_matrix, 1, function(x) sum(!is.na(x)))
   } else{
-  domains_per_res <- rep(0, nrow(meta_hmap))}
+  domains_per_res <- rep(0, nrow(meta_hmap))
+  domain_matrix <- NULL}
+  
+
   
   feature_category <- character(nrow(meta_hmap))
   for (r in seq_len(nrow(meta_hmap))) {
     n_doms <- domains_per_res[r]
-    if(n_doms == 0) {
+    if(n_doms == 0 | is.null(domain_matrix)) {
       feature_category[r] <- "No Feature"
-    } else if(n_doms == 1) {
+    } else if(n_doms == 1 && !is.null(domain_matrix)) {
       # Extract the single non-NA domain
       dom_name <- domain_matrix[r,][!is.na(domain_matrix[r,])]
       feature_category[r] <- dom_name
@@ -606,22 +609,29 @@ interpro_plot <- function(ioi, interpro_ioi_sele = NULL, interpro_file, uniprot_
     height = total_height,
     custom_hovertext = t(hover_text), # for hover
     dendrogram = "none"
-  ) %>%
-    colorbar(
-      title = "MS-Olink correlation", 
-      titlefont = list(size = 10), 
-      tickfont = list(size = 8),
-      which = 2,
-      x = 1,
-      y = 0,
-      len = 100,
-      lenmode = 'pixels',
-      yanchor = 'bottom',
-      thickness = 15,
-      yref = 'paper'
-    )}
+  ) 
+  heatmap <-tryCatch({
+      colorbar(
+        p = heatmap,
+        title = "MS-Olink correlation", 
+        titlefont = list(size = 10), 
+        tickfont = list(size = 8),
+        which = 2,
+        x = 1,
+        y = 0,
+        len = 100,
+        lenmode = 'pixels',
+        yanchor = 'bottom',
+        thickness = 15,
+        yref = 'paper'
+      )
+    }, error = function(e) heatmap)  # return heatmap unchanged if colorbar fails
+ }
   # Remove colorbar and legend for domain plot
-  heatmap$x$data[[1]]$showscale <- FALSE
+  if (!is.null(heatmap$x$data) && length(heatmap$x$data) >= 1 && "showscale" %in% names(heatmap$x$data[[1]])) {
+    heatmap$x$data[[1]]$showscale <- FALSE
+  }
+  
   
   # Help if the isoform is too short
   if (nrow(cor_mat) < 100) {
