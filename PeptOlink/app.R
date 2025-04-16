@@ -1113,18 +1113,7 @@ z-index: 999999 !important;
                  inline = TRUE,
                  
                  # Correlation measure
-                 tags$div(
-                   class = "inline-radio-group",
-                   prettyRadioButtons(
-                     inputId = "corr_measure",
-                     inline = TRUE,
-                     label = "Correlation Measure:",
-                     choices = c("Mean" = "mean", "Median" = "median"),
-                     selected = "mean",
-                     animation = "pulse"
-                   )
-                 ),
-                 
+
                  numericInput(
                    inputId = "corr_threshold",
                    label = "Correlation Threshold ≤",
@@ -1134,21 +1123,22 @@ z-index: 999999 !important;
                    step = 0.01
                  ),
                  
-                 #Divide the section
-                 hr(),
-                 # Spread measure
                  tags$div(
                    class = "inline-radio-group",
                    prettyRadioButtons(
-                     inputId = "spread_measure",
+                     inputId = "corr_measure",
                      inline = TRUE,
-                     label = "Spread Measure:",
-                     choices = c("SD" = "sd", "IQR" = "iqr"),
-                     selected = "sd",
+                     #label = "Correlation Measure:",
+                     label = NULL,
+                     choices = c("Mean" = "mean", "Median" = "median"),
+                     selected = "mean",
                      animation = "pulse"
                    )
                  ),
+                 #Divide the section
+                 hr(),
                  
+                 # Spread measure
                  numericInput(
                    inputId = "spread_threshold",
                    label = "Spread Threshold ≥",
@@ -1157,6 +1147,20 @@ z-index: 999999 !important;
                    min = 0,
                    step = 0.01
                  ),
+                 
+                 tags$div(
+                   class = "inline-radio-group",
+                   prettyRadioButtons(
+                     inputId = "spread_measure",
+                     inline = TRUE,
+                     #label = "Spread Measure:",
+                     label = NULL,
+                     choices = c("SD" = "sd", "IQR" = "iqr"),
+                     selected = "sd",
+                     animation = "pulse"
+                   )
+                 ),
+                 
                  #Divide the section
                  hr(),
                  
