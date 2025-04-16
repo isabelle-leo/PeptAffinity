@@ -933,10 +933,13 @@ alphafold_plot <- function(ioi, genesymb, uniprot_ids,
     addRepresentation("tube", 
                       param = list(name = "tube", backgroundColor = "white", 
                                    colorScheme = "uniform", colorValue = "#808080")) %>%
-    stageParameters(backgroundColor = "white", colorValue = "#808080") %>%
+    stageParameters(backgroundColor = "white", colorValue = "#808080", tooltip = FALSE) %>%
     setQuality("low") %>%
     setFocus(0) %>%
     setSpin(TRUE)
+  
+  #make a spot for corr data
+  p$x$corrData <- residue_corr
   
   # Instead of grouping residues, add a surface representation for each residue (disjoint)
   seq_length <- nchar(fasta_seq)
@@ -955,7 +958,8 @@ alphafold_plot <- function(ioi, genesymb, uniprot_ids,
     }
   }
   
-  # Clean up temporary AlphaFold file and return the NGL view
+
+  # Clean up temporary AlphaFold file and return the plot ( + bonus data for rendering)
   unlink(ioi_alphafold[["content"]])
   return(p)
 }
@@ -1522,10 +1526,74 @@ server <- function(input, output, session) {
   })
   
   # Render the NGL plot output
+  
   output$NGL_plot <- renderNGLVieweR({
     need(ngl_plot_obj(), message = paste("No valid AlphaFold structure file returned for this ID of interest."))
-    ngl_plot_obj()
+    htmlwidgets::onRender(
+      x = ngl_plot_obj(),
+      jsCode = "function(el, x) {
+// Retrieve the Stage by:
+var stage = this.getStage();
+if (!stage) {
+console.error('No NGL Stage found via this.getStage()');
+return;
+}
+
+    // Turn off the built-in tooltip if you wish
+    stage.setParameters({tooltip: false});
+
+    // Create a custom tooltip
+    if(!stage.viewer.container.myTooltip){
+      let tip = document.createElement('div');
+      Object.assign(tip.style, {
+        display: 'none',
+        position: 'absolute',
+        zIndex: 9999,
+        pointerEvents: 'none',
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        color: 'lightgrey',
+        padding: '0.5em',
+        fontFamily: 'sans-serif'
+      });
+      stage.viewer.container.appendChild(tip);
+      stage.viewer.container.myTooltip = tip;
+    }
+    let tip = stage.viewer.container.myTooltip;
+
+    // Retrieve an array of median correlations
+    let corrData = x.corrData || [];
+
+    // Hook a 'hovered' signal to show the residue number + correlation
+    stage.signals.hovered.add(function (pickingProxy) {
+const tip = stage.viewer.container.myTooltip;
+if (!pickingProxy || !pickingProxy.atom) {
+tip.style.display = 'none';
+return;
+}
+let atom = pickingProxy.atom;
+let cp = pickingProxy.canvasPosition;
+
+// If residue mapping is 0-based, so use resno - 1:
+let residueIndex = atom.resno - 1;
+let corrVal = corrData[residueIndex];
+
+// Build the label
+let label = atom.qualifiedName();
+if (typeof corrVal === 'number' && isFinite(corrVal)) {
+label += ', Corr: ' + corrVal.toFixed(3);
+}
+
+tip.style.left = (cp.x + 8) + 'px';
+tip.style.top  = (cp.y + 8) + 'px';
+tip.innerHTML  = label;
+tip.style.display = 'block';
+});
+  }
+  "
+    )
   })
+  
+  
   output$alphafold_warn <- renderUI({
     validate(
       need(ngl_plot_obj(), "No valid AlphaFold structure file returned for this ID of interest.")
