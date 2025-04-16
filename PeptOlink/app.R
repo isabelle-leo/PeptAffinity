@@ -943,7 +943,7 @@ alphafold_plot <- function(ioi, genesymb, uniprot_ids,
   
   # Instead of grouping residues, add a surface representation for each residue (disjoint)
   seq_length <- nchar(fasta_seq)
-  for (pos in 1:seq_length) {
+  errors        <- 0
   valid_pos     <- which(!is.na(residue_colors))
   expected_all  <- length(valid_pos)
   for (pos in valid_pos) {
@@ -1278,7 +1278,15 @@ z-index: 999999 !important;
                       ),
                       fluidRow(
                         column(12,
-                               withSpinner(div(
+                               prettySwitch(
+                                 slim = FALSE,
+                                 inputId  = "spin_switch",
+                                 label    = "Spin",
+                                 value    = FALSE,       # initial state
+                                 inline = TRUE
+                               ),
+                               withSpinner(
+                               div(
                                  id = "ngl-container", 
                                  style = "position:relative;",
                                  
@@ -1561,6 +1569,7 @@ server <- function(input, output, session) {
     req(input$selected_result)
     req(input$selected_isoforms)
     req(nrow(working_plasma_dt()) > 0)
+
     result <- try(
       alphafold_plot(
         ioi = input$selected_isoforms, 
@@ -1569,7 +1578,7 @@ server <- function(input, output, session) {
         peptide_seq_list_file = "data/peptide_seq_list.RDS", 
         fasta_file = NULL, 
         correlation_palette = correlation_palette
-      ),
+        ),
       silent = FALSE
     )
     if (inherits(result, "try-error")) return(NULL)
@@ -1694,7 +1703,15 @@ tip.style.top  =  (y + 8) + 'px';
 });
   }
   "
-    )
+    ) 
+  })
+  
+  observeEvent(input$spin_switch, {
+    if (input$spin_switch) {
+      NGLVieweR_proxy("NGL_plot") %>% updateSpin(TRUE)
+    } else {
+      NGLVieweR_proxy("NGL_plot") %>% updateSpin(FALSE)
+    }
   })
   
   
