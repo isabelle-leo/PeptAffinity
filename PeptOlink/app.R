@@ -1587,10 +1587,16 @@ server <- function(input, output, session) {
   })
   
   # Render the NGL plot output
-  
-  output$NGL_plot <- renderNGLVieweR({
+  # user_agent <- isolate(session$request$HTTP_USER_AGENT)
+  # if (grepl("DuckDuckGo", user_agent, ignore.case=TRUE)) {
+  #   
+  #   output$NGL_plot <- renderText({"⚠️ Sorry, 3D view isn’t supported in DuckDuck. Please open this app in another browser"})
+  #   
+  # } else {
+   output$NGL_plot <- renderNGLVieweR({
     need(ngl_plot_obj(), message = paste("No valid AlphaFold structure file returned for this ID of interest."))
-    htmlwidgets::onRender(
+    
+htmlwidgets::onRender(
       x = ngl_plot_obj(),
       jsCode = "function(el, x) {
       // Troubleshooting helpers below
@@ -1703,8 +1709,10 @@ tip.style.top  =  (y + 8) + 'px';
 });
   }
   "
-    ) 
+    )
   })
+#    } #end else 
+
   
   observeEvent(input$spin_switch, {
     if (input$spin_switch) {
@@ -1779,5 +1787,10 @@ tip.style.top  =  (y + 8) + 'px';
 
 }
 
+#Settings for long structure plots
+options(
+  shiny.heartbeatInterval = 5,    # ping every 5 seconds
+  shiny.heartbeatTimeout  = 300   # wait up to 5 minutes
+)
 
 shinyApp(ui = ui, server = server)
