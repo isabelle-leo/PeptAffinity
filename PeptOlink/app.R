@@ -32,6 +32,9 @@ library(colorspace)
 #  ____) | |____   | |  | |__| | |     
 # |_____/|______|  |_|   \____/|_|     
 
+#readRenviron("project-vol/.Renviron.txt") #local environment
+readRenviron("/home/project-vol/.Renviron") #server environment 
+
 font_add_google("Open Sans", "open-sans")  
 showtext_auto()  # Enable showtext globally
 
@@ -1018,6 +1021,8 @@ ga_send <- function(client_id, name, params = list()) {
     "https://www.google-analytics.com/mp/collect?measurement_id=%s&api_secret=%s",
     measurement_id, api_secret
   )
+  
+  params$engagement_time_msec <- 100 #google needs a time
   
   body <- jsonlite::toJSON(
     list(
