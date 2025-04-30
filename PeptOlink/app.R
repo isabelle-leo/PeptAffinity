@@ -1006,6 +1006,39 @@ color_scale_plot <- function(correlation_palette, n_bins = 100) {
   return(p)
 }
 
+#Google analytics server function
+ga_send <- function(client_id, name, params = list()) {
+  measurement_id <- Sys.getenv("GA_MEASUREMENT_ID")
+  api_secret      <- Sys.getenv("GA_API_SECRET")
+  
+  if (measurement_id == "" || api_secret == "")
+    stop("GA_MEASUREMENT_ID or GA_API_SECRET missing in .Renviron", call. = FALSE)
+  
+  endpoint <- sprintf(
+    "https://www.google-analytics.com/mp/collect?measurement_id=%s&api_secret=%s",
+    measurement_id, api_secret
+  )
+  
+  body <- jsonlite::toJSON(
+    list(
+      client_id = client_id,
+      events    = list(list(name = name, params = params))
+    ),
+    auto_unbox = TRUE
+  )
+  
+  # one-shot HTTPS POST (HTTP 204 on success)
+  curl::curl_fetch_memory(
+    url         = endpoint,
+    handle      = curl::new_handle(
+      customrequest = "POST",
+      httpheader    = c("Content-Type" = "application/json"),
+      postfields    = body
+    )
+  )
+  
+  invisible(NULL)
+}
 
 
 #  _______ _    _ _____  _____ 
@@ -1037,19 +1070,6 @@ ui <- fluidPage(
     tags$link(rel = "stylesheet", href = "https://fonts.googleapis.com/css2?family=Fascinate+Inline&display=swap"),
     tags$link(rel = "icon", type = "image/png", href = "icon.png")
     ),
-  #Google analytics
-  tags$script(async = NA,
-              src = "https://www.googletagmanager.com/gtag/js?id=G-B44G424F24"),
-  tags$script(HTML(sprintf("
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', '%s', { anonymize_ip: true });
-", "G-B44G424F24"))),
-  #For in-shiny page views
-  tags$script(HTML("Shiny.addCustomMessageHandler('ga-pageview', function(msg){
-  gtag('event', 'page_view', {page_path: msg.page});
-});")),
   tags$script(HTML("$(function(){ $('[data-toggle=\"tooltip\"]').tooltip(); });")),
   tags$style(HTML("
 h1, h2, h3, h4 {
@@ -1368,9 +1388,18 @@ z-index: 999999 !important;
 server <- function(input, output, session) {
 
   #Google analytics ping
-  observeEvent(current_route(), {
-    session$sendCustomMessage('ga-pageview',
-                              list(page = current_route()))
+  observe({
+    cid  <- session$token
+    url  <- paste0("https://", session$clientData$url_hostname,
+                   session$clientData$url_pathname)
+    
+    ga_send(cid, "page_view",
+            list(page_title = "Peptolink-staging", page_location = url))
+  })
+  
+  observeEvent(input$download_btn, {
+    ga_send(session$token, "download_click",
+            list(file = "results.tsv"))
   })
   
   gene_stats <- correlation_long_filt %>%
