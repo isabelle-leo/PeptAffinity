@@ -1037,6 +1037,19 @@ ui <- fluidPage(
     tags$link(rel = "stylesheet", href = "https://fonts.googleapis.com/css2?family=Fascinate+Inline&display=swap"),
     tags$link(rel = "icon", type = "image/png", href = "icon.png")
     ),
+  #Google analytics
+  tags$script(async = NA,
+              src = "https://www.googletagmanager.com/gtag/js?id=G-B44G424F24"),
+  tags$script(HTML(sprintf("
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', '%s', { anonymize_ip: true });
+", "G-B44G424F24"))),
+  #For in-shiny page views
+  tags$script(HTML("Shiny.addCustomMessageHandler('ga-pageview', function(msg){
+  gtag('event', 'page_view', {page_path: msg.page});
+});")),
   tags$script(HTML("$(function(){ $('[data-toggle=\"tooltip\"]').tooltip(); });")),
   tags$style(HTML("
 h1, h2, h3, h4 {
@@ -1229,8 +1242,6 @@ z-index: 999999 !important;
            tabsetPanel(
              id = "main_tabs",
              
-             # Detailed first
-             # Replace plotOutput with plotlyOutput for interactive plots
              tabPanel("Features",
                       
                       fluidRow(
@@ -1258,72 +1269,72 @@ z-index: 999999 !important;
                         )
                       )
              ),
-             
-    #          tabPanel("Structural",
-    #                   fluidRow(
-    #                     column(12,
-    #                            
-    #                            span("Alphafold Structural Data", class = "plot-title"),
-    #                            icon("info-circle", class = "info-icon", id = "alphafold_info",
-    #                                 title = "This plot shows median correlation to a paired olink assay for peptides, visualized across the structural layout of the protein. The protein data matches the uniprot accession isoform. The 3D model was created using alphafold (obtained from https://alphafold.ebi.ac.uk/ which has a CC BY 4.0 license). Colored 3D structures represent detected peptides from the mass spec data, while a grey chain backbone represents the entire protein. The results do not imply separate structural entities, they simply represent median correlations and the mapping of these values.",
-    #                                 `data-toggle` = "tooltip")
-    #                     )
-    #                   ),
-    #                   fluidRow(
-    #                     column(12,
-    #                            div(style = "display: flex; justify-content: center;",
-    #                                uiOutput("alphafold_warn")  
-    #                            )
-    #                     )
-    #                   ),
-    #                   fluidRow(
-    #                     column(12,
-    #                            prettySwitch(
-    #                              slim = FALSE,
-    #                              inputId  = "spin_switch",
-    #                              label    = "Spin",
-    #                              value    = FALSE,       # initial state
-    #                              inline = TRUE
-    #                            ),
-    #                            withSpinner(
-    #                            div(
-    #                              id = "ngl-container", 
-    #                              style = "position:relative;",
-    #                              
-    #                              # your NGL widget
-    #                              NGLVieweROutput("NGL_plot", width="100%", height="600px"),
-    #                              
-    #                              # overlay spinner
-    #                              div(
-    #                                id    = "ngl-loading",
-    #                                style = "
-    #   position:absolute;
-    #   top:0; left:0;
-    #   width:100%; height:100%;
-    #   background:rgba(255,255,255,0.8);
-    #   display:flex;
-    #   align-items:center;
-    #   justify-content:center;
-    #   z-index:1000;
-    # ",
-    #                                # bootstrap spinner (any size you like)
-    #                                div(class="spinner-border text-primary", role="status",
-    #                                    span(class="sr-only","Loading…")
-    #                                )
-    #                              )
-    #                            ), type = 4) 
-    #                     )
-    #                   ),
-    # 
-    #                   br(),
-    #                   fluidRow(
-    #                     column(12,
-    #                            div(style = "display: flex; justify-content: center;",
-    #                                plotOutput("color_scale", width = "60%", height = "80px")
-    #                            )
-    #                     )
-    #                   )
-    #          ),
+
+             tabPanel("Structural",
+                      fluidRow(
+                        column(12,
+
+                               span("Alphafold Structural Data", class = "plot-title"),
+                               icon("info-circle", class = "info-icon", id = "alphafold_info",
+                                    title = "This plot shows median correlation to a paired olink assay for peptides, visualized across the structural layout of the protein. The protein data matches the uniprot accession isoform. The 3D model was created using alphafold (obtained from https://alphafold.ebi.ac.uk/ which has a CC BY 4.0 license). Colored 3D structures represent detected peptides from the mass spec data, while a grey chain backbone represents the entire protein. The results do not imply separate structural entities, they simply represent median correlations and the mapping of these values.",
+                                    `data-toggle` = "tooltip")
+                        )
+                      ),
+                      fluidRow(
+                        column(12,
+                               div(style = "display: flex; justify-content: center;",
+                                   uiOutput("alphafold_warn")
+                               )
+                        )
+                      ),
+                      fluidRow(
+                        column(12,
+                               prettySwitch(
+                                 slim = FALSE,
+                                 inputId  = "spin_switch",
+                                 label    = "Spin",
+                                 value    = FALSE,       # initial state
+                                 inline = TRUE
+                               ),
+                               withSpinner(
+                               div(
+                                 id = "ngl-container",
+                                 style = "position:relative;",
+
+                                 # NGL widget
+                                 NGLVieweROutput("NGL_plot", width="100%", height="600px"),
+
+                                 # overlay spinner
+                                 div(
+                                   id    = "ngl-loading",
+                                   style = "
+      position:absolute;
+      top:0; left:0;
+      width:100%; height:100%;
+      background:rgba(255,255,255,0.8);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      z-index:1000;
+    ",
+                                   # bootstrap spinner
+                                   div(class="spinner-border text-primary", role="status",
+                                       span(class="sr-only","Loading…")
+                                   )
+                                 )
+                               ), type = 4)
+                        )
+                      ),
+
+                      br(),
+                      fluidRow(
+                        column(12,
+                               div(style = "display: flex; justify-content: center;",
+                                   plotOutput("color_scale", width = "60%", height = "80px")
+                               )
+                        )
+                      )
+             ),
              
              
              # Summary second/third
@@ -1356,8 +1367,11 @@ z-index: 999999 !important;
 # Define server logic
 server <- function(input, output, session) {
 
-  #anova_results <- readRDS("data/ANOVA_CLUSTER_leiden_1_partition_peptides_bypeptide.RDS")
-  #kruskal_results <- readRDS("data/KRUSKAL_CLUSTER_leiden_1_partition_peptides_bypeptide.RDS")
+  #Google analytics ping
+  observeEvent(current_route(), {
+    session$sendCustomMessage('ga-pageview',
+                              list(page = current_route()))
+  })
   
   gene_stats <- correlation_long_filt %>%
     group_by(gene_symbol) %>%
