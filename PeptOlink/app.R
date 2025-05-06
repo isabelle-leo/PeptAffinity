@@ -1061,7 +1061,7 @@ track_input <- function(id,
     } else {
       list(click = 1)
     }
-    later(function() {
+    later::later(function() {
       ga_send(cid, event_name, params)
     }, delay = 0)
   }, ignoreInit = TRUE)
