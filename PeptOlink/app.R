@@ -1063,7 +1063,7 @@ track_input <- function(id,
     } else {
       list(hit = 1)
     }
-    ga_send(cid, event_name, params)
+    ga_send(cid, event_name, params, customevent = TRUE)
   }, ignoreInit = TRUE)
 }
 
