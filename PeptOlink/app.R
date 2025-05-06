@@ -1011,7 +1011,7 @@ color_scale_plot <- function(correlation_palette, n_bins = 100) {
 }
 
 #Google analytics server function
-ga_send <- function(client_id, name, params = list(), time = FALSE) {
+ga_send <- function(client_id, name, params = list(), time = FALSE, customevent = FALSE) {
   measurement_id <- Sys.getenv("GA_MEASUREMENT_ID")
   api_secret      <- Sys.getenv("GA_API_SECRET")
   
@@ -1024,6 +1024,8 @@ ga_send <- function(client_id, name, params = list(), time = FALSE) {
   )
   
   if(time == TRUE) {params$engagement_time_msec <- 100} #if google needs a time
+  
+  if(customevent == TRUE) {params <- list(hit = 1)} #custom event needs a flag
   
   body <- jsonlite::toJSON(
     list(
@@ -1059,7 +1061,8 @@ track_input <- function(id,
     if (send_value) {
       ga_send(cid,
               event_name,
-              setNames(list(input[[id]]), param_name))
+              setNames(list(input[[id]]), param_name),
+              customevent = TRUE)
     } else {
       # no parameters, will increment event count
       ga_send(cid, event_name)
