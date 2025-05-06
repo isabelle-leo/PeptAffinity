@@ -1051,8 +1051,7 @@ track_input <- function(id,
                         cid = session$token,
                         send_value   = TRUE,      # toggle between values and sum of events
                         event_name   = NULL,
-                        param_name   = "value",
-                        session = shiny::getDefaultReactiveDomain()) {
+                        param_name   = "value") {
   
   event_name <- if (is.null(event_name)) paste0("change_", id) else event_name
   
@@ -1062,10 +1061,8 @@ track_input <- function(id,
     } else {
       list(click = 1)
     }
-    later(function() {
-      ga_send(cid, event_name, params)
-    }, delay = 0)
-  }, ignoreInit = TRUE, domain = session)
+    ga_send(cid, event_name, params)
+  }, ignoreInit = TRUE)
 }
 
 
