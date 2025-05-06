@@ -1438,10 +1438,10 @@ z-index: 999999 !important;
 
 # Define server logic
 server <- function(input, output, session) {
-
+  cid  <- session$token
+  
   #Google analytics ping
   observe({
-    cid  <- session$token
     url  <- paste0("https://", session$clientData$url_hostname,
                    session$clientData$url_pathname)
     
