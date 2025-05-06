@@ -1047,7 +1047,7 @@ ga_send <- function(client_id, name, params = list()) {
 }
 
 track_input <- function(id,
-                        input,
+                        input = NULL,
                         cid = session$token,
                         send_value   = TRUE,      # toggle between values and sum of events
                         event_name   = NULL,
@@ -1450,7 +1450,7 @@ server <- function(input, output, session) {
   })
   
   # InterPro / Prosite
-  track_input("domain_source", cid = cid, send_value = TRUE, event_name = "select_domain_source", param_name = "domain")  
+  track_input("domain_source", cid = cid, input, send_value = TRUE, event_name = "select_domain_source", param_name = "domain")  
   
   # How many filter changes
   purrr::walk(
@@ -1462,15 +1462,18 @@ server <- function(input, output, session) {
   #Did they need help
   track_input("got_help",
               cid = cid, 
+              input,
               send_value = TRUE,
               event_name = "got_help",
               param_name = "section")
   
-  track_input("select_result", cid = cid, send_value = FALSE) # ID picker total activity
-  track_input("isoform_select", cid = cid, send_value = FALSE) # isoform picker total activity
+  track_input("select_result", cid = cid, input, send_value = FALSE) # ID picker total activity
+  track_input("isoform_select", cid = cid, input, send_value = FALSE) # isoform picker total activity
   
   #Track paper links
   track_input("went_paper",
+              input,
+              cid = cid, 
               send_value = TRUE,
               event_name = "went_to_paper",
               param_name = "location")    # 'header' or 'footer'
