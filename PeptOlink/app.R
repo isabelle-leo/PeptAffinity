@@ -100,9 +100,9 @@ correlation_palette_function <- function(x) {
 correlation_palette <- sapply(color_breaks, correlation_palette_function)
 
 color_scale_medians <- c("No correlation" = -.1,  
-             "Weak correlation" = 0.4, 
-             "Moderate correlation" = 0.6,
-             "Strong correlation" = 0.85)
+                         "Weak correlation" = 0.4, 
+                         "Moderate correlation" = 0.6,
+                         "Strong correlation" = 0.85)
 
 categorical_colors <- c(
   "No correlation" = correlation_palette_function(color_scale_medians["No correlation"]),
@@ -238,8 +238,8 @@ interpro_plot <- function(ioi, interpro_ioi_sele = NULL, interpro_file, uniprot_
                                    !is.na(interpro_ioi$description),]
     
   }else {interpro_ioi <- interpro_ioi[interpro_ioi$hgnc_symbol == ioi & 
-                                 !is.null(interpro_ioi$description) & 
-                                 !is.na(interpro_ioi$description),]
+                                        !is.null(interpro_ioi$description) & 
+                                        !is.na(interpro_ioi$description),]
   }
   
   ioi_alphafold <- tryCatch({get_alphafold_file(ioi, uniprot_ids)},
@@ -257,7 +257,7 @@ interpro_plot <- function(ioi, interpro_ioi_sele = NULL, interpro_file, uniprot_
   if (nrow(interpro_ioi) > 0) {
     interpro_options <- unique(interpro_ioi$description)
   }
-
+  
   # Initialize meta_hmap with two columns: Amino acid residue, Olink target correlation
   meta_hmap <- matrix(nrow = nchar(fasta_list[[1]]), ncol = 2)
   colnames(meta_hmap) <- c("Amino acid residue", "Olink target correlation")
@@ -321,17 +321,17 @@ interpro_plot <- function(ioi, interpro_ioi_sele = NULL, interpro_file, uniprot_
   if(nrow(interpro_ioi) > 0){for(domain in interpro_options) {
     meta_hmap[, domain] <- NA
   }
-  
-  # Assign domain annotations
-  for(i in meta_hmap[,'Amino acid residue']) {
-    aa_idx <- which(meta_hmap[,'Amino acid residue'] == i)
-    for(j in seq_len(nrow(interpro_ioi))) {
-      if(i >= interpro_ioi$start[j] & i <= interpro_ioi$end[j]) {
-        dname <- interpro_ioi$description[j]
-        meta_hmap[aa_idx, dname] <- dname
+    
+    # Assign domain annotations
+    for(i in meta_hmap[,'Amino acid residue']) {
+      aa_idx <- which(meta_hmap[,'Amino acid residue'] == i)
+      for(j in seq_len(nrow(interpro_ioi))) {
+        if(i >= interpro_ioi$start[j] & i <= interpro_ioi$end[j]) {
+          dname <- interpro_ioi$description[j]
+          meta_hmap[aa_idx, dname] <- dname
+        }
       }
     }
-  }
   }
   # We now have: 
   # "Amino acid residue", "Olink target correlation", maybe more "Correlation X" columns, and domain columns.
@@ -348,10 +348,10 @@ interpro_plot <- function(ioi, interpro_ioi_sele = NULL, interpro_file, uniprot_
   if(nrow(interpro_ioi) > 0){domain_matrix <- meta_hmap[,interpro_options, drop=FALSE]
   domains_per_res <- apply(domain_matrix, 1, function(x) sum(!is.na(x)))
   } else{
-  domains_per_res <- rep(0, nrow(meta_hmap))
-  domain_matrix <- NULL}
+    domains_per_res <- rep(0, nrow(meta_hmap))
+    domain_matrix <- NULL}
   
-
+  
   
   feature_category <- character(nrow(meta_hmap))
   for (r in seq_len(nrow(meta_hmap))) {
@@ -403,29 +403,29 @@ interpro_plot <- function(ioi, interpro_ioi_sele = NULL, interpro_file, uniprot_
   color_breaks <- seq(-1, 1, length.out = 100)
   correlation_palette <- colorRampPalette(correlation_palette)(100)
   if(nrow(interpro_ioi) > 0){
-  #Substitute the domains for a "no feature" annotation instead of NA
-  domain_matrix<- domain_matrix %>%
-    #mutate(across(everything(), ~ ifelse(!is.na(.), "Feature", .))) %>%
-    mutate(across(everything(), ~ ifelse(is.na(.), "", .))) 
-  
-  # Define color palette for domains
-  domain_matrix_vec <- as.vector(as.matrix(domain_matrix))
-  all_categories <- factor(unique(as.vector(domain_matrix_vec)))
-  #cat_color_mapping <- setNames(interpro_colors[seq_along(all_categories)], all_categories)
-  domain_colors <- colorRampPalette(colors = brewer.pal(9, 'PuBuGn')[2:8])(length(all_categories))
-  
-  cat_color_mapping <- vector("list", length(all_categories))
-  names(cat_color_mapping) <- all_categories
-  for (i in seq_along(all_categories)) {
-    cat_color_mapping[[i]] <- domain_colors[i]
-    names(cat_color_mapping[[i]]) <- all_categories[i]
-  }
+    #Substitute the domains for a "no feature" annotation instead of NA
+    domain_matrix<- domain_matrix %>%
+      #mutate(across(everything(), ~ ifelse(!is.na(.), "Feature", .))) %>%
+      mutate(across(everything(), ~ ifelse(is.na(.), "", .))) 
+    
+    # Define color palette for domains
+    domain_matrix_vec <- as.vector(as.matrix(domain_matrix))
+    all_categories <- factor(unique(as.vector(domain_matrix_vec)))
+    #cat_color_mapping <- setNames(interpro_colors[seq_along(all_categories)], all_categories)
+    domain_colors <- colorRampPalette(colors = brewer.pal(9, 'PuBuGn')[2:8])(length(all_categories))
+    
+    cat_color_mapping <- vector("list", length(all_categories))
+    names(cat_color_mapping) <- all_categories
+    for (i in seq_along(all_categories)) {
+      cat_color_mapping[[i]] <- domain_colors[i]
+      names(cat_color_mapping[[i]]) <- all_categories[i]
+    }
   }
   
   # Total plot height
   if(nrow(interpro_ioi) > 0){
     domain_height <- (ncol(domain_matrix) + 1) * 30
-    } else(domain_height <- 30)
+  } else(domain_height <- 30)
   peptide_height <- (ncol(cor_mat) + 1) * 40
   total_height <- domain_height + peptide_height
   # Proportional heights for subplots
@@ -488,22 +488,22 @@ interpro_plot <- function(ioi, interpro_ioi_sele = NULL, interpro_file, uniprot_
     dendrogram = "none"
   ) 
   heatmap <-tryCatch({
-      colorbar(
-        p = heatmap,
-        title = "MS-Olink correlation", 
-        titlefont = list(size = 10), 
-        tickfont = list(size = 8),
-        which = 2,
-        x = 1,
-        y = 0,
-        len = 100,
-        lenmode = 'pixels',
-        yanchor = 'bottom',
-        thickness = 15,
-        yref = 'paper'
-      )
-    }, error = function(e) heatmap)  # return heatmap unchanged if colorbar fails
- }
+    colorbar(
+      p = heatmap,
+      title = "MS-Olink correlation", 
+      titlefont = list(size = 10), 
+      tickfont = list(size = 8),
+      which = 2,
+      x = 1,
+      y = 0,
+      len = 100,
+      lenmode = 'pixels',
+      yanchor = 'bottom',
+      thickness = 15,
+      yref = 'paper'
+    )
+  }, error = function(e) heatmap)  # return heatmap unchanged if colorbar fails
+  }
   # Remove colorbar and legend for domain plot
   if (!is.null(heatmap$x$data) && length(heatmap$x$data) >= 1 && "showscale" %in% names(heatmap$x$data[[1]])) {
     heatmap$x$data[[1]]$showscale <- FALSE
@@ -557,7 +557,7 @@ jenks_density_plot <- function(ioi, peptide_seq_list_file, uniprot_ids, fasta_fi
   }
   
   gene_peptides <- peptide_seq_list[[ioi]]
-
+  
   
   # Get FASTA sequence from plasma_data_FASTA_by_gene.RDS (pass in fasta_file)
   fasta_seq <- unique(fasta_file$fasta[fasta_file$Gene.Name == ioi])
@@ -674,17 +674,17 @@ combined_interpro_density_plot <- function(ioi, interpro_file, uniprot_ids, inte
     abundance_column = abundance_column,
     correlation_palette = correlation_palette,
     interpro_colors = interpro_colors)} else{heatmap_plot <- interpro_plot(
-    ioi = ioi,
-    interpro_file = interpro_file,
-    uniprot_ids = uniprot_ids,
-    peptide_seq_list_file = peptide_seq_list_file,
-    fasta_file = fasta_file,
-    abundance_file = abundance_file,
-    abundance_column = abundance_column,
-    correlation_palette = correlation_palette,
-    interpro_colors = interpro_colors
-  )
-  }
+      ioi = ioi,
+      interpro_file = interpro_file,
+      uniprot_ids = uniprot_ids,
+      peptide_seq_list_file = peptide_seq_list_file,
+      fasta_file = fasta_file,
+      abundance_file = abundance_file,
+      abundance_column = abundance_column,
+      correlation_palette = correlation_palette,
+      interpro_colors = interpro_colors
+    )
+    }
   
   # Generate the Density Plot using ggplot2
   density_plot_gg <- jenks_density_plot(
@@ -970,7 +970,7 @@ alphafold_plot <- function(ioi, genesymb, uniprot_ids,
   
   #Add a counter for the plot loading animation
   p$x$surfaceCount <- expected_all - errors
-
+  
   # Clean up temporary AlphaFold file and return the plot ( + bonus data for rendering)
   unlink(ioi_alphafold[["content"]])
   return(p)
@@ -1061,7 +1061,9 @@ track_input <- function(id,
     } else {
       list(click = 1)
     }
-    ga_send(cid, event_name, params)
+    later(function() {
+      ga_send(cid, event_name, params)
+    }, delay = 0)
   }, ignoreInit = TRUE)
 }
 
@@ -1094,7 +1096,7 @@ ui <- fluidPage(
   tags$head(
     tags$link(rel = "stylesheet", href = "https://fonts.googleapis.com/css2?family=Fascinate+Inline&display=swap"),
     tags$link(rel = "icon", type = "image/png", href = "icon.png")
-    ),
+  ),
   tags$script(HTML("$(function(){ $('[data-toggle=\"tooltip\"]').tooltip(); });
   // emit a Shiny input every time an info icon is clicked
   $(document).on('click', '.info-icon', function () {
@@ -1190,7 +1192,7 @@ z-index: 999999 !important;
       class  = "paper-link",
       title  = "Click to read the preprint 💖 © 2025 built by Isabelle Leo Noora Sissala and Haris Babačić",  # native tooltip
       onclick = "Shiny.setInputValue('went_paper','header',{priority:'event'});"
-      ),
+    ),
     windowTitle = "PeptOlink"
   ),
   fluidRow(
@@ -1206,7 +1208,7 @@ z-index: 999999 !important;
                  inline = TRUE,
                  
                  # Correlation measure
-
+                 
                  numericInput(
                    inputId = "corr_threshold",
                    label = "Correlation Threshold ≤",
@@ -1306,21 +1308,21 @@ z-index: 999999 !important;
              tabPanel("Features",
                       
                       fluidRow(
-                               div(
-                                 class = "domain-toggle",
-                                 radioGroupButtons(
-                                   inputId = "domain_source",
-                                   label = "Feature Source:",
-                                   choices = c("InterPro", "Prosite"),
-                                   selected = "InterPro",
-                                   justified = TRUE,
-                                   size = "sm"
-                                 ),
-                               icon("info-circle", class = "info-icon", id = "detailed_info",
-                                    title = "Here, we show the selected isoform with features from the InterPro or Prosite databases and the correlations of all mapped peptides. Peptides which cover the same mapping on the primary sequence are separated into multiple rows.",
-                                    `data-toggle` = "tooltip")
-
-
+                        div(
+                          class = "domain-toggle",
+                          radioGroupButtons(
+                            inputId = "domain_source",
+                            label = "Feature Source:",
+                            choices = c("InterPro", "Prosite"),
+                            selected = "InterPro",
+                            justified = TRUE,
+                            size = "sm"
+                          ),
+                          icon("info-circle", class = "info-icon", id = "detailed_info",
+                               title = "Here, we show the selected isoform with features from the InterPro or Prosite databases and the correlations of all mapped peptides. Peptides which cover the same mapping on the primary sequence are separated into multiple rows.",
+                               `data-toggle` = "tooltip")
+                          
+                          
                         )
                       ),
                       br(),
@@ -1330,11 +1332,11 @@ z-index: 999999 !important;
                         )
                       )
              ),
-
+             
              tabPanel("Structural",
                       fluidRow(
                         column(12,
-
+                               
                                span("Alphafold Structural Data", class = "plot-title"),
                                icon("info-circle", class = "info-icon", id = "alphafold_info",
                                     title = "This plot shows median correlation to a paired olink assay for peptides, visualized across the structural layout of the protein. The protein data matches the uniprot accession isoform. The 3D model was created using alphafold (obtained from https://alphafold.ebi.ac.uk/ which has a CC BY 4.0 license). Colored 3D structures represent detected peptides from the mass spec data, while a grey chain backbone represents the entire protein. The results do not imply separate structural entities, they simply represent median correlations and the mapping of these values.",
@@ -1358,17 +1360,17 @@ z-index: 999999 !important;
                                  inline = TRUE
                                ),
                                withSpinner(
-                               div(
-                                 id = "ngl-container",
-                                 style = "position:relative;",
-
-                                 # NGL widget
-                                 NGLVieweROutput("NGL_plot", width="100%", height="600px"),
-
-                                 # overlay spinner
                                  div(
-                                   id    = "ngl-loading",
-                                   style = "
+                                   id = "ngl-container",
+                                   style = "position:relative;",
+                                   
+                                   # NGL widget
+                                   NGLVieweROutput("NGL_plot", width="100%", height="600px"),
+                                   
+                                   # overlay spinner
+                                   div(
+                                     id    = "ngl-loading",
+                                     style = "
       position:absolute;
       top:0; left:0;
       width:100%; height:100%;
@@ -1378,15 +1380,15 @@ z-index: 999999 !important;
       justify-content:center;
       z-index:1000;
     ",
-                                   # bootstrap spinner
-                                   div(class="spinner-border text-primary", role="status",
-                                       span(class="sr-only","Loading…")
+                                     # bootstrap spinner
+                                     div(class="spinner-border text-primary", role="status",
+                                         span(class="sr-only","Loading…")
+                                     )
                                    )
-                                 )
-                               ), type = 4)
+                                 ), type = 4)
                         )
                       ),
-
+                      
                       br(),
                       fluidRow(
                         column(12,
@@ -1540,7 +1542,7 @@ server <- function(input, output, session) {
     updateNumericInput(session, "spread_threshold", value = 0)
     updateNumericInput(session, "n_peptides", value = 5)
     updateNumericInput(session, "n_isoforms", value = 1)
-   
+    
   })
   
   # UI for selecting results
@@ -1632,10 +1634,10 @@ server <- function(input, output, session) {
             axis.title = element_text(size = 16),
             axis.text = element_text(size = 13),
             plot.title = element_text(size = 18)
-    )
+      )
     
   })
-
+  
   output$volcano_plot <- renderPlotly({
     fd <-  gene_stats %>% filter(!is.na(sd_corr), gene_symbol %in% filtered_data()$gene_symbol)
     req(fd)
@@ -1682,14 +1684,14 @@ server <- function(input, output, session) {
     
   })
   
-
-    
+  
+  
   # Check for the plot being possible using a reactive
   ngl_plot_obj <- reactive({
     req(input$selected_result)
     req(input$selected_isoforms)
     req(nrow(working_plasma_dt()) > 0)
-
+    
     result <- try(
       alphafold_plot(
         ioi = input$selected_isoforms, 
@@ -1698,7 +1700,7 @@ server <- function(input, output, session) {
         peptide_seq_list_file = "data/peptide_seq_list.RDS", 
         fasta_file = NULL, 
         correlation_palette = correlation_palette
-        ),
+      ),
       silent = FALSE
     )
     if (inherits(result, "try-error")) return(NULL)
@@ -1713,10 +1715,10 @@ server <- function(input, output, session) {
   #   output$NGL_plot <- renderText({"⚠️ Sorry, 3D view isn’t supported in DuckDuck. Please open this app in another browser"})
   #   
   # } else {
-   output$NGL_plot <- renderNGLVieweR({
+  output$NGL_plot <- renderNGLVieweR({
     need(ngl_plot_obj(), message = paste("No valid AlphaFold structure file returned for this ID of interest."))
     
-htmlwidgets::onRender(
+    htmlwidgets::onRender(
       x = ngl_plot_obj(),
       jsCode = "function(el, x) {
       // Troubleshooting helpers below
@@ -1831,8 +1833,8 @@ tip.style.top  =  (y + 8) + 'px';
   "
     )
   })
-#    } #end else 
-
+  #    } #end else 
+  
   
   observeEvent(input$spin_switch, {
     if (input$spin_switch) {
@@ -1855,7 +1857,7 @@ tip.style.top  =  (y + 8) + 'px';
     color_scale_plot(correlation_palette = sapply(seq(-1, 1, length.out = 100), correlation_palette_function),
                      n_bins = 100)
   })
-
+  
   
   output$detailed_plot <- renderPlotly({
     req(input$selected_result)
@@ -1904,7 +1906,7 @@ tip.style.top  =  (y + 8) + 'px';
         )
       )
   })
-
+  
 }
 
 #Settings for long structure plots
