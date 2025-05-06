@@ -31,7 +31,8 @@ library(colorspace)
 #  \___ \|  __|    | |  | |  | |  ___/ 
 #  ____) | |____   | |  | |__| | |     
 # |_____/|______|  |_|   \____/|_|     
-
+paper_link <- "https://dx.doi.org/10.21203/rs.3.rs-6501601/v1"
+#Sys.setenv(GA_API_SECRET = "12345", GA_MEASUREMENT_ID = "1234") #To fake the variables for testing
 #readRenviron("project-vol/.Renviron.txt") #local environment
 readRenviron("/home/project-vol/.Renviron") #server environment 
 
@@ -1045,6 +1046,26 @@ ga_send <- function(client_id, name, params = list()) {
   invisible(NULL)
 }
 
+track_input <- function(id,
+                        cid = session$token,
+                        send_value   = TRUE,      # toggle between values and sum of events
+                        event_name   = NULL,
+                        param_name   = "value") {
+  
+  event_name <- if (is.null(event_name)) paste0("change_", id) else event_name
+  
+  observeEvent(input[[id]], {
+    if (send_value) {
+      ga_send(cid,
+              event_name,
+              setNames(list(input[[id]]), param_name))
+    } else {
+      # no parameters, will increment event count
+      ga_send(cid, event_name)
+    }
+  }, ignoreInit = TRUE)
+}
+
 
 #  _______ _    _ _____  _____ 
 # |__   __| |  | |_   _|/ ____|
@@ -1116,7 +1137,9 @@ z-index: 999999 !important;
   justify-content: flex-start; /* left-align the row */
   margin-bottom: 10px;
 }
-
+  .paper-link { text-decoration:none; color: #ff5c8d; /* Vibrant pink-orange color */}
+  .paper-link:hover { text-decoration:underline; cursor:pointer; }
+  
 .domain-toggle .btn-group {
   display: flex;
   gap: 5px; /* space between buttons */
@@ -1151,10 +1174,24 @@ z-index: 999999 !important;
   box-shadow: 0 0 0 2px #CDB1E8; 
 }
 
+  /* emit a Shiny input every time an info icon is clicked
+  $(document).on('click', '.info-icon', function () {
+    const section = $(this).attr('id') || 'unknown';
+
+    // priority:'event' fires even if user clicks the same icon twice in a row
+    Shiny.setInputValue('got_help', section, {priority: 'event'});
+  });
 
   ")),
   titlePanel(
-    "PeptOlink",
+    tags$a(
+      "PeptOlink",
+      href   = paper_link,  # ← replaces automatically (see setup section)
+      id     = "paper_link_header",
+      target = "_blank",          # open in new tab
+      class  = "paper-link",
+      title  = "Click to read the preprint 💖 © 2025 built by Isabelle Leo Noora Sissala and Haris Babačić"  # native tooltip
+    ),
     windowTitle = "PeptOlink"
   ),
   fluidRow(
@@ -1295,71 +1332,71 @@ z-index: 999999 !important;
                       )
              ),
 
-    #          tabPanel("Structural",
-    #                   fluidRow(
-    #                     column(12,
-    # 
-    #                            span("Alphafold Structural Data", class = "plot-title"),
-    #                            icon("info-circle", class = "info-icon", id = "alphafold_info",
-    #                                 title = "This plot shows median correlation to a paired olink assay for peptides, visualized across the structural layout of the protein. The protein data matches the uniprot accession isoform. The 3D model was created using alphafold (obtained from https://alphafold.ebi.ac.uk/ which has a CC BY 4.0 license). Colored 3D structures represent detected peptides from the mass spec data, while a grey chain backbone represents the entire protein. The results do not imply separate structural entities, they simply represent median correlations and the mapping of these values.",
-    #                                 `data-toggle` = "tooltip")
-    #                     )
-    #                   ),
-    #                   fluidRow(
-    #                     column(12,
-    #                            div(style = "display: flex; justify-content: center;",
-    #                                uiOutput("alphafold_warn")
-    #                            )
-    #                     )
-    #                   ),
-    #                   fluidRow(
-    #                     column(12,
-    #                            prettySwitch(
-    #                              slim = FALSE,
-    #                              inputId  = "spin_switch",
-    #                              label    = "Spin",
-    #                              value    = FALSE,       # initial state
-    #                              inline = TRUE
-    #                            ),
-    #                            withSpinner(
-    #                            div(
-    #                              id = "ngl-container",
-    #                              style = "position:relative;",
-    # 
-    #                              # NGL widget
-    #                              NGLVieweROutput("NGL_plot", width="100%", height="600px"),
-    # 
-    #                              # overlay spinner
-    #                              div(
-    #                                id    = "ngl-loading",
-    #                                style = "
-    #   position:absolute;
-    #   top:0; left:0;
-    #   width:100%; height:100%;
-    #   background:rgba(255,255,255,0.8);
-    #   display:flex;
-    #   align-items:center;
-    #   justify-content:center;
-    #   z-index:1000;
-    # ",
-    #                                # bootstrap spinner
-    #                                div(class="spinner-border text-primary", role="status",
-    #                                    span(class="sr-only","Loading…")
-    #                                )
-    #                              )
-    #                            ), type = 4)
-    #                     )
-    #                   ),
-    # 
-    #                   br(),
-    #                   fluidRow(
-    #                     column(12,
-    #                            div(style = "display: flex; justify-content: center;",
-    #                                plotOutput("color_scale", width = "60%", height = "80px")
-    #                            )
-    #                     )
-    #                   )
-    #          ),
+             tabPanel("Structural",
+                      fluidRow(
+                        column(12,
+
+                               span("Alphafold Structural Data", class = "plot-title"),
+                               icon("info-circle", class = "info-icon", id = "alphafold_info",
+                                    title = "This plot shows median correlation to a paired olink assay for peptides, visualized across the structural layout of the protein. The protein data matches the uniprot accession isoform. The 3D model was created using alphafold (obtained from https://alphafold.ebi.ac.uk/ which has a CC BY 4.0 license). Colored 3D structures represent detected peptides from the mass spec data, while a grey chain backbone represents the entire protein. The results do not imply separate structural entities, they simply represent median correlations and the mapping of these values.",
+                                    `data-toggle` = "tooltip")
+                        )
+                      ),
+                      fluidRow(
+                        column(12,
+                               div(style = "display: flex; justify-content: center;",
+                                   uiOutput("alphafold_warn")
+                               )
+                        )
+                      ),
+                      fluidRow(
+                        column(12,
+                               prettySwitch(
+                                 slim = FALSE,
+                                 inputId  = "spin_switch",
+                                 label    = "Spin",
+                                 value    = FALSE,       # initial state
+                                 inline = TRUE
+                               ),
+                               withSpinner(
+                               div(
+                                 id = "ngl-container",
+                                 style = "position:relative;",
+
+                                 # NGL widget
+                                 NGLVieweROutput("NGL_plot", width="100%", height="600px"),
+
+                                 # overlay spinner
+                                 div(
+                                   id    = "ngl-loading",
+                                   style = "
+      position:absolute;
+      top:0; left:0;
+      width:100%; height:100%;
+      background:rgba(255,255,255,0.8);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      z-index:1000;
+    ",
+                                   # bootstrap spinner
+                                   div(class="spinner-border text-primary", role="status",
+                                       span(class="sr-only","Loading…")
+                                   )
+                                 )
+                               ), type = 4)
+                        )
+                      ),
+
+                      br(),
+                      fluidRow(
+                        column(12,
+                               div(style = "display: flex; justify-content: center;",
+                                   plotOutput("color_scale", width = "60%", height = "80px")
+                               )
+                        )
+                      )
+             ),
              
              
              # Summary second/third
@@ -1386,6 +1423,15 @@ z-index: 999999 !important;
              )
            )
     )
+  ),
+  tags$footer(
+    style = "text-align:center; font-size:0.8em; margin-top:20px;",
+    tags$a(
+      href   = paper_link, # ← replaces automatically (see setup section)
+      id     = "paper_link_footer",
+      target = "_blank",
+      "Read the PeptOlink preprint"
+    )
   )
 )
 
@@ -1399,15 +1445,36 @@ server <- function(input, output, session) {
                    session$clientData$url_pathname)
     
     ga_send(cid, "page_view",
-            list(page_title = "Peptolink", page_location = url))
+            list(page_title = "Peptolink-staging", page_location = url))
   })
   
-  #See if we can get this from plotly (TBD)
-  # observeEvent(input$download_btn, {
-  #   ga_send(session$token, "download_click",
-  #           list(file = "results.tsv"))
-  # })
+  # InterPro / Prosite
+  track_input("domain_source", cid = cid, send_value = TRUE, event_name = "select_domain_source", param_name = "domain")  
   
+  # How many filter changes
+  purrr::walk(
+    c("corr_threshold", "corr_measure",
+      "spread_threshold", "spread_measure",
+      "n_peptides", "n_isoforms"),
+    ~ track_input(.x, cid = cid, send_value = FALSE))
+  
+  #Did they need help
+  track_input("got_help",
+              cid = cid, 
+              send_value = TRUE,
+              event_name = "got_help",
+              param_name = "section")
+  
+  track_input("select_result", cid = cid, send_value = FALSE) # ID picker total activity
+  track_input("isoform_select", cid = cid, send_value = FALSE) # isoform picker total activity
+  
+  #Track paper links
+  track_input("went_paper",
+              send_value = TRUE,
+              event_name = "went_to_paper",
+              param_name = "location")    # 'header' or 'footer'
+  
+  # Data processing
   gene_stats <- correlation_long_filt %>%
     group_by(gene_symbol) %>%
     summarise(
