@@ -1047,6 +1047,7 @@ ga_send <- function(client_id, name, params = list()) {
 }
 
 track_input <- function(id,
+                        input,
                         cid = session$token,
                         send_value   = TRUE,      # toggle between values and sum of events
                         event_name   = NULL,
