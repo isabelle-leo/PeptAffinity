@@ -1025,7 +1025,7 @@ ga_send <- function(client_id, name, params = list(), time = FALSE, customevent 
   
   if(time == TRUE) {params$engagement_time_msec <- 100} #if google needs a time
   
-  if(customevent == TRUE) {params <- list(hit = 1)} #custom event needs a flag
+  if(customevent == TRUE) {params$hit <- 1} #custom event needs a flag
   
   body <- jsonlite::toJSON(
     list(
