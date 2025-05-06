@@ -1011,7 +1011,7 @@ color_scale_plot <- function(correlation_palette, n_bins = 100) {
 }
 
 #Google analytics server function
-ga_send <- function(client_id, name, params = list()) {
+ga_send <- function(client_id, name, params = list(), time = FALSE) {
   measurement_id <- Sys.getenv("GA_MEASUREMENT_ID")
   api_secret      <- Sys.getenv("GA_API_SECRET")
   
@@ -1023,7 +1023,7 @@ ga_send <- function(client_id, name, params = list()) {
     measurement_id, api_secret
   )
   
-  params$engagement_time_msec <- 100 #google needs a time
+  if(time == TRUE) {params$engagement_time_msec <- 100} #if google needs a time
   
   body <- jsonlite::toJSON(
     list(
@@ -1446,37 +1446,38 @@ server <- function(input, output, session) {
                    session$clientData$url_pathname)
     
     ga_send(cid, "page_view",
-            list(page_title = "Peptolink-staging", page_location = url))
+            list(page_title = "Peptolink-staging", page_location = url),
+            time = TRUE)
   })
   
-  # InterPro / Prosite
-  track_input("domain_source", cid = cid, input, send_value = TRUE, event_name = "select_domain_source", param_name = "domain")  
+  ## 1. domain toggle (value matters) --------------------------------------
+  track_input("domain_source",  input, cid,
+              send_value = TRUE,
+              event_name = "select_domain_source",
+              param_name = "domain")
   
-  # How many filter changes
+  ## 2. six filter controls (count only) -----------------------------------
   purrr::walk(
     c("corr_threshold", "corr_measure",
       "spread_threshold", "spread_measure",
-      "n_peptides", "n_isoforms"),
-    ~ track_input(.x, cid = cid, send_value = FALSE))
+      "n_peptides",      "n_isoforms"),
+    ~ track_input(.x, input, cid, send_value = FALSE))
   
-  #Did they need help
-  track_input("got_help",
-              cid = cid, 
-              input,
+  ## 3. help‑icon clicks ---------------------------------------------------
+  track_input("got_help",  input, cid,
               send_value = TRUE,
               event_name = "got_help",
               param_name = "section")
   
-  track_input("select_result", cid = cid, input, send_value = FALSE) # ID picker total activity
-  track_input("isoform_select", cid = cid, input, send_value = FALSE) # isoform picker total activity
+  ## 4. ID & isoform selectors --------------------------------------------
+  track_input("select_result",  input, cid, send_value = FALSE)
+  track_input("isoform_select", input, cid, send_value = FALSE)
   
-  #Track paper links
-  track_input("went_paper",
-              input,
-              cid = cid, 
+  ## 5. preprint link clicks ----------------------------------------------
+  track_input("went_paper",  input, cid,
               send_value = TRUE,
               event_name = "went_to_paper",
-              param_name = "location")    # 'header' or 'footer'
+              param_name = "location")   # header / footer
   
   # Data processing
   gene_stats <- correlation_long_filt %>%
