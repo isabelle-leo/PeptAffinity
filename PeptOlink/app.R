@@ -1025,7 +1025,7 @@ ga_send <- function(client_id, name, params = list(), time = FALSE, customevent 
   
   if(time == TRUE) {params$engagement_time_msec <- 100} #if google needs a time
   
-  if(customevent == TRUE) {params$hit <- 1} #custom event needs a flag
+  if(customevent == TRUE) {params$click <- 1} #custom event needs a flag
   
   body <- jsonlite::toJSON(
     list(
@@ -1058,15 +1058,12 @@ track_input <- function(id,
   event_name <- if (is.null(event_name)) paste0("change_", id) else event_name
   
   observeEvent(input[[id]], {
-    if (send_value) {
-      ga_send(cid,
-              event_name,
-              setNames(list(input[[id]]), param_name),
-              customevent = TRUE)
+    params <- if (send_value) {
+      setNames(list(input[[id]]), param_name)
     } else {
-      # no parameters, will increment event count
-      ga_send(cid, event_name)
+      list(hit = 1)
     }
+    ga_send(cid, event_name, params)
   }, ignoreInit = TRUE)
 }
 
@@ -1100,7 +1097,14 @@ ui <- fluidPage(
     tags$link(rel = "stylesheet", href = "https://fonts.googleapis.com/css2?family=Fascinate+Inline&display=swap"),
     tags$link(rel = "icon", type = "image/png", href = "icon.png")
     ),
-  tags$script(HTML("$(function(){ $('[data-toggle=\"tooltip\"]').tooltip(); });")),
+  tags$script(HTML("$(function(){ $('[data-toggle=\"tooltip\"]').tooltip(); });
+  // emit a Shiny input every time an info icon is clicked
+  $(document).on('click', '.info-icon', function () {
+    const section = $(this).attr('id') || 'unknown';
+
+    // priority:'event' fires even if user clicks the same icon twice in a row
+    Shiny.setInputValue('got_help', section, {priority: 'event'});
+  });")),
   tags$style(HTML("
 h1, h2, h3, h4 {
       font-family: 'Fascinate Inline', cursive;
@@ -1177,14 +1181,6 @@ z-index: 999999 !important;
   outline: none;
   box-shadow: 0 0 0 2px #CDB1E8; 
 }
-
-  /* emit a Shiny input every time an info icon is clicked
-  $(document).on('click', '.info-icon', function () {
-    const section = $(this).attr('id') || 'unknown';
-
-    // priority:'event' fires even if user clicks the same icon twice in a row
-    Shiny.setInputValue('got_help', section, {priority: 'event'});
-  });
 
   ")),
   titlePanel(
