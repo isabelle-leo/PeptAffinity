@@ -1190,8 +1190,9 @@ z-index: 999999 !important;
       id     = "paper_link_header",
       target = "_blank",          # open in new tab
       class  = "paper-link",
-      title  = "Click to read the preprint 💖 © 2025 built by Isabelle Leo Noora Sissala and Haris Babačić"  # native tooltip
-    ),
+      title  = "Click to read the preprint 💖 © 2025 built by Isabelle Leo Noora Sissala and Haris Babačić",  # native tooltip
+      onclick = "Shiny.setInputValue('went_paper','header',{priority:'event'});"
+      ),
     windowTitle = "PeptOlink"
   ),
   fluidRow(
@@ -1430,6 +1431,7 @@ z-index: 999999 !important;
       href   = paper_link, # ← replaces automatically (see setup section)
       id     = "paper_link_footer",
       target = "_blank",
+      onclick  = "Shiny.setInputValue('went_paper','footer',{priority:'event'});",
       "Read the PeptOlink preprint"
     )
   )
