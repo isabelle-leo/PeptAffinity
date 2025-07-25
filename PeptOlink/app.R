@@ -24,7 +24,11 @@ library(plotly)
 library(RColorBrewer)
 library(NGLVieweR)
 library(colorspace)
-
+#Make colors spectral again
+#Use the range sliders
+#Make the color scale smaller for the structure
+#Change download width of plotly domain plot
+#Add font to function
 #   _____ ______ _______ _    _ _____  
 #  / ____|  ____|__   __| |  | |  __ \ 
 # | (___ | |__     | |  | |  | | |__) |
@@ -32,9 +36,9 @@ library(colorspace)
 #  ____) | |____   | |  | |__| | |     
 # |_____/|______|  |_|   \____/|_|     
 paper_link <- "https://dx.doi.org/10.21203/rs.3.rs-6501601/v1"
-#Sys.setenv(GA_API_SECRET = "12345", GA_MEASUREMENT_ID = "1234") #To fake the variables for testing
-#readRenviron("project-vol/.Renviron.txt") #local environment
-readRenviron("/home/project-vol/.Renviron") #server environment 
+Sys.setenv(GA_API_SECRET = "12345", GA_MEASUREMENT_ID = "1234") #To fake the variables for testing
+renv::activate() #local environment
+#readRenviron("/home/project-vol/.Renviron") #server environment 
 
 font_add_google("Open Sans", "open-sans")  
 showtext_auto()  # Enable showtext globally
@@ -47,57 +51,58 @@ setkey(plasma_dt, Gene.Name)
 
 
 color_breaks <- seq(-1, 1, length.out = 100)
-correlation_palette_function <- function(x) {
-  x <- pmax(pmin(x, 1), -1)
-  if(x < 0) {
-    pink_pal <- colorRampPalette(c("#e60045","#ff1a5e", "#ff5c8d", "#ff80a6", "#ffb3c9", "#ffe6ed"))(100)
-    idx <- round((x - (-1)) / (0 - (-1)) * 99) + 1
-    return(pink_pal[idx])
-  } else if (0 <= x && x < .3) {
-    neut_pal <- colorRampPalette(c("#ffe6ed", "gray95", viridis(100, option = "mako")[100]))(100)
-    idx <- round((x - 0) / (0.3 - 0) * 99) + 1
-    return(neut_pal[idx])
-  }else {
-    idx <- round(100 - (x - .3) / (1 - .3) * 99) + 1
-    return(viridis(100, option = "mako")[idx])
-  }
-}
-
-# correlation_palette_function <- (function(){
-#   # Define anchors
-#   ax <- c(1, 0.7, 0.4, 0.3, 0, -0.3, -0.5, -0.7, -1)
-#   ah <- c( "#0B0405FF","#e60045", "#ff80a6", "#ffb3c9","#ffe6ed",
-#           "#DEF5E5FF",  "#A0DFB9FF", "#38AAACFF","#357BA2FF")
-#   
-#   # Convert anchor hex codes to an RGB matrix (each row = one color in [0,1])
-#   rgb_mat <- t(col2rgb(ah)) / 255
-#   
-#   # Convert from sRGB to Lab
-#   lab_mat <- convertColor(rgb_mat, from = "sRGB", to = "Lab", scale.in = 1)
-#   
-#   # Create natural spline functions for Lab channels L, a, and b
-#   Lfun <- splinefun(ax, lab_mat[, 1], method = "natural")
-#   afun <- splinefun(ax, lab_mat[, 2], method = "natural")
-#   bfun <- splinefun(ax, lab_mat[, 3], method = "natural")
-#   
-#   # Return the palette function mapping a value x in [-1,1] to a hex color.
-#   function(x) {
-#     x_clamped <- pmax(pmin(x, 1), -1)
-#     L_val <- Lfun(x_clamped)
-#     a_val <- afun(x_clamped)
-#     b_val <- bfun(x_clamped)
-#     # Combine into a matrix where each row is a color in Lab space.
-#     lab_interpolated <- cbind(L_val, a_val, b_val)
-#     # Convert back to sRGB with clip = TRUE (by default, convertColor clips out-of-range values).
-#     rgb_interpolated <- convertColor(lab_interpolated, from = "Lab", to = "sRGB", scale.out = 1)
-#     # For vectorized input, convert each row to a hex code.
-#     apply(rgb_interpolated, 1, function(row) {
-#       rgb(row[1], row[2], row[3])
-#     })
+# correlation_palette_function <- function(x) {
+#   x <- pmax(pmin(x, 1), -1)
+#   if(x < 0) {
+#     pink_pal <- colorRampPalette(c("#e60045","#ff1a5e", "#ff5c8d", "#ff80a6", "#ffb3c9", "#ffe6ed"))(100)
+#     idx <- round((x - (-1)) / (0 - (-1)) * 99) + 1
+#     return(pink_pal[idx])
+#   } else if (0 <= x && x < .3) {
+#     neut_pal <- colorRampPalette(c("#ffe6ed", "gray95", viridis(100, option = "mako")[100]))(100)
+#     idx <- round((x - 0) / (0.3 - 0) * 99) + 1
+#     return(neut_pal[idx])
+#   }else {
+#     idx <- round(100 - (x - .3) / (1 - .3) * 99) + 1
+#     return(viridis(100, option = "mako")[idx])
 #   }
-# })()
+# }
+
+correlation_palette_function <- (function(){
+  # Define anchors
+  ax <- c(1, 0.7, 0.4, 0.3, 0, -0.3, -0.5, -0.7, -1)
+  ah <- c( "#0B0405FF","#e60045", "#ff80a6", "#ffb3c9","#ffe6ed",
+          "#DEF5E5FF",  "#A0DFB9FF", "#38AAACFF","#357BA2FF")
+
+  # Convert anchor hex codes to an RGB matrix (each row = one color in [0,1])
+  rgb_mat <- t(col2rgb(ah)) / 255
+
+  # Convert from sRGB to Lab
+  lab_mat <- convertColor(rgb_mat, from = "sRGB", to = "Lab", scale.in = 1)
+
+  # Create natural spline functions for Lab channels L, a, and b
+  Lfun <- splinefun(ax, lab_mat[, 1], method = "natural")
+  afun <- splinefun(ax, lab_mat[, 2], method = "natural")
+  bfun <- splinefun(ax, lab_mat[, 3], method = "natural")
+
+  # Return the palette function mapping a value x in [-1,1] to a hex color.
+  function(x) {
+    x_clamped <- pmax(pmin(x, 1), -1)
+    L_val <- Lfun(x_clamped)
+    a_val <- afun(x_clamped)
+    b_val <- bfun(x_clamped)
+    # Combine into a matrix where each row is a color in Lab space.
+    lab_interpolated <- cbind(L_val, a_val, b_val)
+    # Convert back to sRGB with clip = TRUE (by default, convertColor clips out-of-range values).
+    rgb_interpolated <- convertColor(lab_interpolated, from = "Lab", to = "sRGB", scale.out = 1)
+    # For vectorized input, convert each row to a hex code.
+    apply(rgb_interpolated, 1, function(row) {
+      rgb(row[1], row[2], row[3])
+    })
+  }
+})()
 
 correlation_palette <- sapply(color_breaks, correlation_palette_function)
+
 
 color_scale_medians <- c("No correlation" = -.1,  
                          "Weak correlation" = 0.4, 
@@ -408,20 +413,20 @@ interpro_plot <- function(ioi, interpro_ioi_sele = NULL, interpro_file, uniprot_
       #mutate(across(everything(), ~ ifelse(!is.na(.), "Feature", .))) %>%
       mutate(across(everything(), ~ ifelse(is.na(.), "", .))) 
     
-    # Define color palette for domains
-    domain_matrix_vec <- as.vector(as.matrix(domain_matrix))
-    all_categories <- factor(unique(as.vector(domain_matrix_vec)))
-    #cat_color_mapping <- setNames(interpro_colors[seq_along(all_categories)], all_categories)
-    domain_colors <- colorRampPalette(colors = brewer.pal(9, 'PuBuGn')[2:8])(length(all_categories))
+    domain_matrix <- as.matrix(domain_matrix)
+    storage.mode(domain_matrix) <- "character"
     
-    cat_color_mapping <- vector("list", length(all_categories))
-    names(cat_color_mapping) <- all_categories
-    for (i in seq_along(all_categories)) {
-      cat_color_mapping[[i]] <- domain_colors[i]
-      names(cat_color_mapping[[i]]) <- all_categories[i]
-    }
+    # Optional: blank cells as NA so they won't get coloured
+    domain_matrix[domain_matrix == ""] <- NA
+    
+    # One colour per domain **column**, in the SAME order they appear in the plot
+    pal_domains <- rep_len(interpro_colors, ncol(domain_matrix))
+    names(pal_domains) <- colnames(domain_matrix)
+    
+    # heatmaply expects a function that returns n colours – give back the first n
+    col_side_palette_fixed <- function(n) pal_domains[seq_len(n)]
+    
   }
-  
   # Total plot height
   if(nrow(interpro_ioi) > 0){
     domain_height <- (ncol(domain_matrix) + 1) * 30
@@ -449,7 +454,7 @@ interpro_plot <- function(ioi, interpro_ioi_sele = NULL, interpro_file, uniprot_
     colv = F,
     Rowv = F,
     plot_method ='plotly',
-    col_side_palette = colorRampPalette(brewer.pal(9, 'PuBuGn')[2:8]), # not working at the moment, works if you don't use "plotly" but then rest is broken
+    col_side_palette = col_side_palette_fixed, # not working at the moment, works if you don't use "plotly" but then rest is broken
     hoverinfo = "text",
     subplot_heights = c(domain_height, peptide_height),
     height = total_height,
@@ -510,14 +515,9 @@ interpro_plot <- function(ioi, interpro_ioi_sele = NULL, interpro_file, uniprot_
   }
   
   
-  # Help if the isoform is too short
-  if (nrow(cor_mat) < 100) {
-    tickvals <- integer(0)
-  } else if (nrow(cor_mat) > 2000) {
-    tickvals <- seq(1000, nrow(cor_mat), by = 1000)
-  }else {
-    tickvals <- seq(100, nrow(cor_mat), by = 100)
-  }
+  # Tickvals for anything by length
+    tickvals <-  seq(1, nrow(cor_mat), length.out = 10)
+
   
   heatmap <- heatmap %>% 
     layout(
@@ -1094,7 +1094,7 @@ track_input <- function(id,
 ui <- fluidPage(
   theme = my_theme,
   tags$head(
-    tags$link(rel = "stylesheet", href = "https://fonts.googleapis.com/css2?family=Fascinate+Inline&display=swap"),
+    tags$link(rel = "stylesheet", href = "https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&display=swap"),
     tags$link(rel = "icon", type = "image/png", href = "icon.png")
   ),
   tags$script(HTML("$(function(){ $('[data-toggle=\"tooltip\"]').tooltip(); });
@@ -1107,7 +1107,7 @@ ui <- fluidPage(
   });")),
   tags$style(HTML("
 h1, h2, h3, h4 {
-      font-family: 'Fascinate Inline', cursive;
+      font-family: 'Chakra Petch', cursive;
       color: #ff5c8d; /* Vibrant pink-orange color */
 }
     .shiny-plot-output, .plotly {
@@ -1185,7 +1185,7 @@ z-index: 999999 !important;
   ")),
   titlePanel(
     tags$a(
-      "PeptOlink",
+      "PeptAffinity",
       href   = paper_link,  # ← replaces automatically (see setup section)
       id     = "paper_link_header",
       target = "_blank",          # open in new tab
@@ -1193,7 +1193,7 @@ z-index: 999999 !important;
       title  = "Click to read the preprint 💖 © 2025 built by Isabelle Leo Noora Sissala and Haris Babačić",  # native tooltip
       onclick = "Shiny.setInputValue('went_paper','header',{priority:'event'});"
     ),
-    windowTitle = "PeptOlink"
+    windowTitle = "PeptAffinity"
   ),
   fluidRow(
     column(3,
@@ -1216,6 +1216,15 @@ z-index: 999999 !important;
                    max = 1,
                    min = -1,
                    step = 0.01
+                 ),
+                 
+                 prettyRadioButtons(
+                   inputId  = "corr_direction",
+                   label    = NULL,
+                   inline   = TRUE,
+                   choices  = c("≤" = "le", "≥" = "ge"),
+                   selected = "le",
+                   animation = "pulse"
                  ),
                  
                  tags$div(
@@ -1242,6 +1251,8 @@ z-index: 999999 !important;
                    min = 0,
                    step = 0.01
                  ),
+                 
+                 
                  
                  tags$div(
                    class = "inline-radio-group",
@@ -1332,11 +1343,11 @@ z-index: 999999 !important;
                         )
                       )
              ),
-             
+    #          
              tabPanel("Structural",
                       fluidRow(
                         column(12,
-                               
+
                                span("Alphafold Structural Data", class = "plot-title"),
                                icon("info-circle", class = "info-icon", id = "alphafold_info",
                                     title = "This plot shows median correlation to a paired olink assay for peptides, visualized across the structural layout of the protein. The protein data matches the uniprot accession isoform. The 3D model was created using alphafold (obtained from https://alphafold.ebi.ac.uk/ which has a CC BY 4.0 license). Colored 3D structures represent detected peptides from the mass spec data, while a grey chain backbone represents the entire protein. The results do not imply separate structural entities, they simply represent median correlations and the mapping of these values.",
@@ -1363,10 +1374,10 @@ z-index: 999999 !important;
                                  div(
                                    id = "ngl-container",
                                    style = "position:relative;",
-                                   
+
                                    # NGL widget
                                    NGLVieweROutput("NGL_plot", width="100%", height="600px"),
-                                   
+
                                    # overlay spinner
                                    div(
                                      id    = "ngl-loading",
@@ -1388,7 +1399,7 @@ z-index: 999999 !important;
                                  ), type = 4)
                         )
                       ),
-                      
+
                       br(),
                       fluidRow(
                         column(12,
@@ -1432,7 +1443,7 @@ z-index: 999999 !important;
       id     = "paper_link_footer",
       target = "_blank",
       onclick  = "Shiny.setInputValue('went_paper','footer',{priority:'event'});",
-      "Read the PeptOlink preprint"
+      "Read the PeptAffinity preprint"
     )
   )
 )
@@ -1447,7 +1458,7 @@ server <- function(input, output, session) {
                    session$clientData$url_pathname)
     
     ga_send(cid, "page_view",
-            list(page_title = "Peptolink-staging", page_location = url),
+            list(page_title = "PeptAffinity", page_location = url),
             time = TRUE)
   })
   
@@ -1894,7 +1905,7 @@ tip.style.top  =  (y + 8) + 'px';
       abundance_file = NULL, 
       abundance_column = "quant",
       correlation_palette =  sapply(seq(-1, 1, length.out = 100), correlation_palette_function),
-      interpro_colors = c("#CCDDAA", "#EEEEBB", "#FFCCCC", "#DDDDDD", "#BBCCEE", "#CCEEFF")
+      interpro_colors = c("#bab0ac") #the REAL colors! Other function passes into this one for combined plot!!
     ) |> 
       config(
         # add download button

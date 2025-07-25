@@ -2,3 +2,5 @@
 .DS_Store
 .DS_Store
 PeptOlink/.DS_Store
+.Rproj.user
+PeptOlink/test_ui.R
