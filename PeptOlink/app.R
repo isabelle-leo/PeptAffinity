@@ -24,8 +24,6 @@ library(plotly)
 library(RColorBrewer)
 library(NGLVieweR)
 library(colorspace)
-#Use the range sliders
-#Make the color scale smaller for the structure
 #Change download width of plotly domain plot
 #Add font to function
 #   _____ ______ _______ _    _ _____  
@@ -35,9 +33,9 @@ library(colorspace)
 #  ____) | |____   | |  | |__| | |     
 # |_____/|______|  |_|   \____/|_|     
 paper_link <- "https://dx.doi.org/10.21203/rs.3.rs-6501601/v1"
-Sys.setenv(GA_API_SECRET = "12345", GA_MEASUREMENT_ID = "1234") #To fake the variables for testing
+#Sys.setenv(GA_API_SECRET = "12345", GA_MEASUREMENT_ID = "1234") #To fake the variables for testing
 #renv::activate() #local environment
-#readRenviron("/home/project-vol/.Renviron") #server environment 
+readRenviron("/home/project-vol/.Renviron") #server environment 
 
 font_add_google("Open Sans", "open-sans")  
 showtext_auto()  # Enable showtext globally
@@ -989,15 +987,15 @@ color_scale_plot <- function(correlation_palette, n_bins = 100) {
     scale_y_continuous(breaks = NULL, expand = c(0, 0)) +
     theme_minimal(base_family = "Open Sans") +
     theme(
-      text = element_text(color = "#4F0433", size = 20),
-      axis.text = element_text(color = "#4F0433", size = 20),
-      axis.title = element_text(color = "#4F0433", size = 20),
-      plot.title = element_text(color = "#4F0433", size = 20),
-      plot.subtitle = element_text(color = "#4F0433", size = 20),
-      plot.caption = element_text(color = "#4F0433", size = 20),
-      legend.text = element_text(color = "#4F0433", size = 20),
-      legend.title = element_text(color = "#4F0433", size = 20),
-      strip.text = element_text(color = "#4F0433", size = 20)  # for facets
+      text = element_text(color = "#4F0433", size = 16),
+      axis.text = element_text(color = "#4F0433", size = 16),
+      axis.title = element_text(color = "#4F0433", size = 16),
+      plot.title = element_text(color = "#4F0433", size = 16),
+      plot.subtitle = element_text(color = "#4F0433", size = 16),
+      plot.caption = element_text(color = "#4F0433", size = 16),
+      legend.text = element_text(color = "#4F0433", size = 16),
+      legend.title = element_text(color = "#4F0433", size = 16),
+      strip.text = element_text(color = "#4F0433", size = 16)  # for facets
     )+
     theme(axis.title.y = element_blank(),
           axis.text.y  = element_blank(),
@@ -1005,7 +1003,7 @@ color_scale_plot <- function(correlation_palette, n_bins = 100) {
           axis.line.y  = element_blank(),
           panel.grid   = element_blank(),
           legend.position = "none",
-          plot.margin  = unit(c(0.2, 0.2, 0.2, 0.2), "cm")) +
+          plot.margin  = margin(t = 5.5, r = 18, b = 5.5, l = 18)) +
     labs(x = "Correlation", fill = NULL)
   
   return(p)
@@ -1402,7 +1400,7 @@ z-index: 999999 !important;
                       fluidRow(
                         column(12,
                                div(style = "display: flex; justify-content: center;",
-                                   plotOutput("color_scale", width = "60%", height = "80px")
+                                   plotOutput("color_scale", width = "30%", height = "60px")
                                )
                         )
                       )
