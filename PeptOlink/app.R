@@ -1908,7 +1908,7 @@ tip.style.top  =  (y + 8) + 'px';
         toImageButtonOptions = list(
           format = "svg",
           filename = paste0('heatmap_', input$selected_result),
-          width = 650,
+          width = 800,
           height = 300
         )
       )
