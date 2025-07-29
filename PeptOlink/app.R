@@ -24,7 +24,6 @@ library(plotly)
 library(RColorBrewer)
 library(NGLVieweR)
 library(colorspace)
-#Make colors spectral again
 #Use the range sliders
 #Make the color scale smaller for the structure
 #Change download width of plotly domain plot
@@ -37,7 +36,7 @@ library(colorspace)
 # |_____/|______|  |_|   \____/|_|     
 paper_link <- "https://dx.doi.org/10.21203/rs.3.rs-6501601/v1"
 Sys.setenv(GA_API_SECRET = "12345", GA_MEASUREMENT_ID = "1234") #To fake the variables for testing
-renv::activate() #local environment
+#renv::activate() #local environment
 #readRenviron("/home/project-vol/.Renviron") #server environment 
 
 font_add_google("Open Sans", "open-sans")  
@@ -70,8 +69,10 @@ color_breaks <- seq(-1, 1, length.out = 100)
 correlation_palette_function <- (function(){
   # Define anchors
   ax <- c(1, 0.7, 0.4, 0.3, 0, -0.3, -0.5, -0.7, -1)
-  ah <- c( "#0B0405FF","#e60045", "#ff80a6", "#ffb3c9","#ffe6ed",
-          "#DEF5E5FF",  "#A0DFB9FF", "#38AAACFF","#357BA2FF")
+  # ah <- c( "#0B0405FF","#e60045", "#ff80a6", "#ffb3c9","#ffe6ed",
+  #         "#DEF5E5FF",  "#A0DFB9FF", "#38AAACFF","#357BA2FF")
+  ah <- c( "#d53e4f","#f46d43", "#fdae61", "#fee08b","#ffffbf",
+           "#e6f598",  "#abdda4", "#66c2a5","#3288bd")
 
   # Convert anchor hex codes to an RGB matrix (each row = one color in [0,1])
   rgb_mat <- t(col2rgb(ah)) / 255
@@ -388,12 +389,12 @@ interpro_plot <- function(ioi, interpro_ioi_sele = NULL, interpro_file, uniprot_
   hover_text <- matrix(nrow = dim(cor_mat)[1], ncol = dim(cor_mat)[2])
   
   colnames(hover_text) <- colnames(cor_mat)
-  
   for(j in colnames(cor_mat)){
     
     hover_text[,j] <- paste0("Residue: ", meta_hmap[,"Amino acid residue"],
                              "<br>Correlation: ", round(cor_mat[,j], 3),
-                             "<br>Feature: ", feature_category)
+                             "<br>Feature: ", feature_category,
+                              "<br>Samples in comparison: ", peptide_seq_list$N) #Fix similar to domains so its accurate per peptide
     
   }
   
@@ -516,7 +517,7 @@ interpro_plot <- function(ioi, interpro_ioi_sele = NULL, interpro_file, uniprot_
   
   
   # Tickvals for anything by length
-    tickvals <-  seq(1, nrow(cor_mat), length.out = 10)
+    tickvals <-  as.integer(seq(1, nrow(cor_mat), length.out = 10))
 
   
   heatmap <- heatmap %>% 
@@ -1274,10 +1275,10 @@ z-index: 999999 !important;
                  numericInput(
                    inputId = "n_peptides",
                    label = "Number of peptides ≥", 
-                   value = 5,
+                   value = 3,
                    max = 500, 
                    min = 1, 
-                   step = 5
+                   step = 1
                  ),
                  
                  #Divide the section
@@ -1316,7 +1317,21 @@ z-index: 999999 !important;
            tabsetPanel(
              id = "main_tabs",
              
-             tabPanel("Features",
+             tabPanel("Home",
+                      fluidRow(
+                        column(12,
+                               h3("Welcome to PeptAffinity"),
+                               p("• ‘Sequence’ – interactive domain/peptide feature visualization heatmap"),
+                               p("• ‘Structure’ – AlphaFold model coloured by median correlation for detected peptides"),
+                               p("• ‘All proteins’ – global summary and volcano plots"),
+                               p("Use the filters in the left panel to narrow down gene IDs or adjust
+        correlation/variation thresholds.")
+                        )
+                      )
+             ),
+             
+             
+             tabPanel("Sequence",
                       
                       fluidRow(
                         div(
@@ -1344,7 +1359,7 @@ z-index: 999999 !important;
                       )
              ),
     #          
-             tabPanel("Structural",
+             tabPanel("Structure",
                       fluidRow(
                         column(12,
 
@@ -1412,7 +1427,7 @@ z-index: 999999 !important;
              
              
              # Summary second/third
-             tabPanel("Summary",
+             tabPanel("All proteins",
                       fluidRow(
                         column(12,
                                span("Summary of Filtered Results", class = "plot-title"),
