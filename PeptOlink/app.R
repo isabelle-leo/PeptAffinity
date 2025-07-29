@@ -1210,22 +1210,9 @@ z-index: 999999 !important;
                  
                  # Correlation measure
                  
-                 numericInput(
-                   inputId = "corr_threshold",
-                   label = "Correlation Threshold ≤",
-                   value = 1,
-                   max = 1,
-                   min = -1,
-                   step = 0.01
-                 ),
-                 
-                 prettyRadioButtons(
-                   inputId  = "corr_direction",
-                   label    = NULL,
-                   inline   = TRUE,
-                   choices  = c("≤" = "le", "≥" = "ge"),
-                   selected = "le",
-                   animation = "pulse"
+                 sliderInput(
+                   "corr_threshold", "Correlation range",
+                   min = -1, max = 1, value = c(-1, 1), step = 0.01
                  ),
                  
                  tags$div(
@@ -1244,13 +1231,9 @@ z-index: 999999 !important;
                  hr(),
                  
                  # Spread measure
-                 numericInput(
-                   inputId = "spread_threshold",
-                   label = "Spread Threshold ≥",
-                   value = 0,
-                   max = 1,
-                   min = 0,
-                   step = 0.01
+                 sliderInput(
+                   "spread_threshold", "Spread range",
+                   min = 0, max = .5, value = c(0, 0.5), step = 0.01
                  ),
                  
                  
@@ -1537,8 +1520,8 @@ server <- function(input, output, session) {
     # Filter genes based on user inputs
     filtered_genes <- gene_stats %>%
       filter(
-        .data[[corr_col]] <= input$corr_threshold,
-        .data[[spread_col]] >= input$spread_threshold,
+        dplyr::between(.data[[corr_col]],   input$corr_threshold[1],   input$corr_threshold[2]),
+        dplyr::between(.data[[spread_col]], input$spread_threshold[1], input$spread_threshold[2]),
         n_peptides >= input$n_peptides,
         n_isoforms >= input$n_isoforms
       ) %>%
@@ -1564,8 +1547,8 @@ server <- function(input, output, session) {
     # Reset thresholds
     # Goal: Show everything
     # Does not change any radio buttons
-    updateNumericInput(session, "corr_threshold", value = 1)
-    updateNumericInput(session, "spread_threshold", value = 0)
+    updateNumericInput(session, "corr_threshold", value = c(-1,1))
+    updateNumericInput(session, "spread_threshold", value = c(0,.5))
     updateNumericInput(session, "n_peptides", value = 5)
     updateNumericInput(session, "n_isoforms", value = 1)
     
