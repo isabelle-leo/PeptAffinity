@@ -33,7 +33,7 @@ library(colorspace)
 paper_link <- "https://dx.doi.org/10.21203/rs.3.rs-6501601/v1"
 #Sys.setenv(GA_API_SECRET = "12345", GA_MEASUREMENT_ID = "1234") #To fake the variables for testing
 #renv::activate() #local environment
-#readRenviron("/home/project-vol/.Renviron") #server environment 
+readRenviron("/home/project-vol/.Renviron") #server environment 
 
 font_add_google("Open Sans", "open-sans")  
 showtext_auto()  # Enable showtext globally
