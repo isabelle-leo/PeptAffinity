@@ -24,8 +24,6 @@ library(plotly)
 library(RColorBrewer)
 library(NGLVieweR)
 library(colorspace)
-#Change download width of plotly domain plot
-#Add font to function
 #   _____ ______ _______ _    _ _____  
 #  / ____|  ____|__   __| |  | |  __ \ 
 # | (___ | |__     | |  | |  | | |__) |
@@ -35,7 +33,7 @@ library(colorspace)
 paper_link <- "https://dx.doi.org/10.21203/rs.3.rs-6501601/v1"
 #Sys.setenv(GA_API_SECRET = "12345", GA_MEASUREMENT_ID = "1234") #To fake the variables for testing
 #renv::activate() #local environment
-readRenviron("/home/project-vol/.Renviron") #server environment 
+#readRenviron("/home/project-vol/.Renviron") #server environment 
 
 font_add_google("Open Sans", "open-sans")  
 showtext_auto()  # Enable showtext globally
@@ -1901,7 +1899,7 @@ tip.style.top  =  (y + 8) + 'px';
       abundance_file = NULL, 
       abundance_column = "quant",
       correlation_palette =  sapply(seq(-1, 1, length.out = 100), correlation_palette_function),
-      interpro_colors = c("#bab0ac") #the REAL colors! Other function passes into this one for combined plot!!
+      interpro_colors = c("#CDB1E8") #the REAL colors! Other function passes into this one for combined plot!!
     ) |> 
       config(
         # add download button
