@@ -1207,7 +1207,7 @@ z-index: 999999 !important;
                  # Correlation measure
                  
                  sliderInput(
-                   "corr_threshold", "Correlation range",
+                   "corr_threshold", "Peptide correlation",
                    min = -1, max = 1, value = c(-1, 1), step = 0.01
                  ),
                  
@@ -1228,7 +1228,7 @@ z-index: 999999 !important;
                  
                  # Spread measure
                  sliderInput(
-                   "spread_threshold", "Spread range",
+                   "spread_threshold", "Peptide correlation spread",
                    min = 0, max = .5, value = c(0, 0.5), step = 0.01
                  ),
                  
@@ -1300,11 +1300,11 @@ z-index: 999999 !important;
                       fluidRow(
                         column(12,
                                h3("Welcome to PeptAffinity"),
-                               p("• ‘Sequence’ – interactive domain/peptide feature visualization heatmap"),
-                               p("• ‘Structure’ – AlphaFold model coloured by median correlation for detected peptides"),
-                               p("• ‘All proteins’ – global summary and volcano plots"),
-                               p("Use the filters in the left panel to narrow down gene IDs or adjust
-        correlation/variation thresholds.")
+                               p("Explore correlations between peptides quantified by MS and their corresponding Olink assays across protein sequences and structures using interactive visualizations."),
+                               p("• ‘Sequence’ – heatmap visualizing MS-Olink correlations for peptides mapped along the protein sequence, with associated protein domains and features"),
+                               p("• ‘Structure’ – AlphaFold model of the protein structure, coloured by median MS-Olink correlation for detected peptides"),
+                               p("• ‘All proteins’ – global summary of the dataset"),
+                               p("Select a protein of interest in the left panel. Use the filters to narrow down the list of proteins based on correlation thresholds.")
                         )
                       )
              ),
@@ -1324,7 +1324,7 @@ z-index: 999999 !important;
                             size = "sm"
                           ),
                           icon("info-circle", class = "info-icon", id = "detailed_info",
-                               title = "Here, we show the selected isoform with features from the InterPro or Prosite databases and the correlations of all mapped peptides. Peptides which cover the same mapping on the primary sequence are separated into multiple rows.",
+                               title = "Here, we show the selected isoform with features from the InterPro or Prosite databases and the correlations of all mapped MS peptides to the corresponding Olink assay. Peptides covering the same position on the primary sequence are separated into multiple rows.",
                                `data-toggle` = "tooltip")
                           
                           
@@ -1344,7 +1344,7 @@ z-index: 999999 !important;
 
                                span("Alphafold Structural Data", class = "plot-title"),
                                icon("info-circle", class = "info-icon", id = "alphafold_info",
-                                    title = "This plot shows median correlation to a paired olink assay for peptides, visualized across the structural layout of the protein. The protein data matches the uniprot accession isoform. The 3D model was created using alphafold (obtained from https://alphafold.ebi.ac.uk/ which has a CC BY 4.0 license). Colored 3D structures represent detected peptides from the mass spec data, while a grey chain backbone represents the entire protein. The results do not imply separate structural entities, they simply represent median correlations and the mapping of these values.",
+                                    title = "This plot shows median correlation to a paired olink assay for peptides quantified by MS, visualized across the protein structure for the selected uniprot ID. The 3D model was created using alphafold (obtained from https://alphafold.ebi.ac.uk/ which has a CC BY 4.0 license). Colored 3D structures represent detected peptides from the MS data, while a grey chain backbone represents the entire protein. The results do not imply separate structural entities, they simply represent median correlations and the mapping of these values.",
                                     `data-toggle` = "tooltip")
                         )
                       ),
@@ -1411,7 +1411,7 @@ z-index: 999999 !important;
                         column(12,
                                span("Summary of Filtered Results", class = "plot-title"),
                                icon("info-circle", class = "info-icon", id = "summary_info",
-                                    title = "These results cover the whole dataset, you can use them to understand the general peptide properties for gene symbols in the data and can guide your filter selections for detailed explorations.",
+                                    title = "These results present overall MS-Olink peptide correlations for each protein in the dataset. Use this tab to get an overview of the dataset and to inform filter selections for detailed explorations.",
                                     `data-toggle` = "tooltip")
                         )
                       ),
