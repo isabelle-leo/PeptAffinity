@@ -1254,7 +1254,7 @@ z-index: 999999 !important;
                  numericInput(
                    inputId = "n_peptides",
                    label = "Number of peptides ≥", 
-                   value = 3,
+                   value = 1,
                    max = 500, 
                    min = 1, 
                    step = 1
@@ -1545,7 +1545,7 @@ server <- function(input, output, session) {
     # Does not change any radio buttons
     updateNumericInput(session, "corr_threshold", value = c(-1,1))
     updateNumericInput(session, "spread_threshold", value = c(0,.5))
-    updateNumericInput(session, "n_peptides", value = 5)
+    updateNumericInput(session, "n_peptides", value = 1)
     updateNumericInput(session, "n_isoforms", value = 1)
     
   })
@@ -1899,7 +1899,7 @@ tip.style.top  =  (y + 8) + 'px';
       abundance_file = NULL, 
       abundance_column = "quant",
       correlation_palette =  sapply(seq(-1, 1, length.out = 100), correlation_palette_function),
-      interpro_colors = c("#CDB1E8") #the REAL colors! Other function passes into this one for combined plot!!
+      interpro_colors = c("#a7a6ba") #the REAL colors! Other function passes into this one for combined plot!!
     ) |> 
       config(
         # add download button
