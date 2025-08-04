@@ -31,8 +31,8 @@ library(colorspace)
 #  ____) | |____   | |  | |__| | |     
 # |_____/|______|  |_|   \____/|_|     
 paper_link <- "https://dx.doi.org/10.21203/rs.3.rs-6501601/v1"
-Sys.setenv(GA_API_SECRET = "12345", GA_MEASUREMENT_ID = "1234") #To fake the variables for testing
-#readRenviron("/home/project-vol/.Renviron") #server environment 
+# Sys.setenv(GA_API_SECRET = "12345", GA_MEASUREMENT_ID = "1234") #To fake the variables for testing
+readRenviron("/home/project-vol/.Renviron") #server environment 
 
 font_add_google("Open Sans", "open-sans")  
 showtext_auto()  # Enable showtext globally
@@ -1208,7 +1208,7 @@ z-index: 999999 !important;
                      inline = TRUE,
                      #label = "Correlation Measure:",
                      label = NULL,
-                     choices = c("Mean" = "mean", "Median" = "median"),
+                     choices = c("Mean" = "mean", "Center" = "center"),
                      selected = "mean",
                      animation = "pulse"
                    )
@@ -1219,7 +1219,7 @@ z-index: 999999 !important;
                  # Spread measure
                  sliderInput(
                    "spread_threshold", "Peptide correlation spread",
-                   min = 0, max = .5, value = c(0, 0.5), step = 0.01
+                   min = 0, max = 1, value = c(0, 1), step = 0.01
                  ),
                  
                  
@@ -1231,7 +1231,7 @@ z-index: 999999 !important;
                      inline = TRUE,
                      #label = "Spread Measure:",
                      label = NULL,
-                     choices = c("SD" = "sd", "IQR" = "iqr"),
+                     choices = c("SD" = "sd", "Range" = "range"),
                      selected = "sd",
                      animation = "pulse"
                    )
@@ -1481,8 +1481,8 @@ server <- function(input, output, session) {
     summarise(
       mean_corr = mean(correlation, na.rm = TRUE),
       sd_corr = sd(correlation, na.rm = TRUE),
-      median_corr = (max(correlation, na.rm = TRUE) + min(correlation, na.rm = TRUE))/2, #NOT MEDIAN TESTING
-      iqr_corr = max(correlation, na.rm = TRUE) - min(correlation, na.rm = TRUE), #NOT IQR TESTING 
+      center_corr = (max(correlation, na.rm = TRUE) + min(correlation, na.rm = TRUE))/2, #NOT MEDIAN TESTING
+      range_corr = max(correlation, na.rm = TRUE) - min(correlation, na.rm = TRUE), #NOT IQR TESTING 
       n_peptides = n(),
       n_isoforms = length(unique(unlist(strsplit(paste(UniProt.MS, collapse = ";"), ";"))))
     )
@@ -1500,8 +1500,8 @@ server <- function(input, output, session) {
       input$n_isoforms
     ) 
     
-    corr_col <- if (input$corr_measure == "mean") "mean_corr" else "median_corr"
-    spread_col <- if (input$spread_measure == "sd") "sd_corr" else "iqr_corr"
+    corr_col <- if (input$corr_measure == "mean") "mean_corr" else "center_corr"
+    spread_col <- if (input$spread_measure == "sd") "sd_corr" else "range_corr"
     
     # Filter genes based on user inputs
     filtered_genes <- gene_stats %>%
@@ -1534,7 +1534,7 @@ server <- function(input, output, session) {
     # Goal: Show everything
     # Does not change any radio buttons
     updateNumericInput(session, "corr_threshold", value = c(-1,1))
-    updateNumericInput(session, "spread_threshold", value = c(0,.5))
+    updateNumericInput(session, "spread_threshold", value = c(0,1))
     updateNumericInput(session, "n_peptides", value = 1)
     updateNumericInput(session, "n_isoforms", value = 1)
     
@@ -1657,20 +1657,20 @@ server <- function(input, output, session) {
   })
   
   output$volcano_plot2 <- renderPlotly({
-    fd <-  gene_stats %>% filter(!is.na(iqr_corr), gene_symbol %in% filtered_data()$gene_symbol)
+    fd <-  gene_stats %>% filter(!is.na(range_corr), gene_symbol %in% filtered_data()$gene_symbol)
     req(fd)
     
     p <- ggplot(fd, aes(
-      x = median_corr,
-      y = iqr_corr,
+      x = center_corr,
+      y = range_corr,
       size = n_peptides,
       text = paste("Gene:", gene_symbol,
-                   "<br>Median Corr:", round(median_corr, 2),
-                   "<br>IQR:", round(iqr_corr, 2),
+                   "<br>Corr center:", round(center_corr, 2),
+                   "<br>Corr range:", round(range_corr, 2),
                    "<br>Peptides:", n_peptides)
     )) +
       geom_point(alpha = 0.8, fill = "#77D9C7", shape = 21, stroke = 0.2, color = 'grey40') +
-      labs(x = "Median correlation", y = "IQR", title = "Median vs. IQR") +
+      labs(x = "Correlation center", y = "Correlation range", title = "Center vs. Range") +
       theme_classic2() +
       theme(plot.title = element_text(face = "bold"),
             legend.title = element_blank())
