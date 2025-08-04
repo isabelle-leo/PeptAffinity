@@ -31,9 +31,8 @@ library(colorspace)
 #  ____) | |____   | |  | |__| | |     
 # |_____/|______|  |_|   \____/|_|     
 paper_link <- "https://dx.doi.org/10.21203/rs.3.rs-6501601/v1"
-#Sys.setenv(GA_API_SECRET = "12345", GA_MEASUREMENT_ID = "1234") #To fake the variables for testing
-#renv::activate() #local environment
-readRenviron("/home/project-vol/.Renviron") #server environment 
+Sys.setenv(GA_API_SECRET = "12345", GA_MEASUREMENT_ID = "1234") #To fake the variables for testing
+#readRenviron("/home/project-vol/.Renviron") #server environment 
 
 font_add_google("Open Sans", "open-sans")  
 showtext_auto()  # Enable showtext globally
@@ -265,53 +264,42 @@ interpro_plot <- function(ioi, interpro_ioi_sele = NULL, interpro_file, uniprot_
   colnames(meta_hmap) <- c("Amino acid residue", "Olink target correlation")
   meta_hmap[,'Amino acid residue'] <- as.numeric(1:nchar(fasta_list[[1]]))
   
+  seq_col <- "peptides" 
+  n_col   <- "N"
+  samples_cols <- list()
   
-  # Function to process peptides and handle overlaps (as before)
-  process_peptides <- function(col) {
+  # Function to process peptides and handle overlaps
+  process_peptides <- function(col, samples_vec) {
     overlap_peptides <- list()
     for (k in seq_along(peptide_indices)) {
       start <- as.numeric(peptide_indices[[k]][["start_position"]])
-      end <- start + nchar(peptide_indices[[k]][["peptide"]]) - 1
-      added_to_overlap <- FALSE
-      cat("k =", k, "peptide =", peptide_indices[[k]][["peptide"]], "\n")
+      end   <- start + nchar(peptide_indices[[k]][["peptide"]]) - 1
+      if (is.na(start) || is.na(end) || start < 1 || end > nrow(meta_hmap) || start > end) next
       
-      before_len <- nchar(fasta_list)
-      after_sub  <- gsub(paste0(peptide_indices[[k]][["peptide"]], ".*"), "", fasta_list)
-      cat("Before length =", before_len, 
-          "After length =", nchar(after_sub), 
-          "start_position =", nchar(after_sub) + 1, 
-          "\n"
-      )
+      pep_seq <- peptide_indices[[k]][["peptide"]]
+      idx_tbl <- match(pep_seq, peptide_seq_list[[seq_col]])
+      N_k <- peptide_seq_list[[n_col]][idx_tbl]
       
-      if (is.na(start) || is.na(end) || start < 1 || end > nrow(meta_hmap) || start > end) {
-        # skip this peptide if it lacks valid mapping
-        # some lack valid mapping!!!!
-        next
-      }
-      if(all(is.na(meta_hmap[start:end, col]))){
-        meta_hmap[start:end, col] <- rep(peptide_indices[[k]][["target_correlation"]], times = length(start:end))
+      if (all(is.na(meta_hmap[start:end, col]))) {
+        meta_hmap[start:end, col] <- peptide_indices[[k]][["target_correlation"]]
+        samples_vec[start:end]    <- N_k
       } else {
-        added_to_overlap = TRUE
-      }
-      
-      if (added_to_overlap) {
         overlap_peptides[[length(overlap_peptides) + 1]] <- peptide_indices[[k]]
       }
     }
-    return(list(overlap_peptides=overlap_peptides, meta_hmap=meta_hmap))
+    list(overlap_peptides = overlap_peptides, meta_hmap = meta_hmap, samples_vec = samples_vec)
   }
   
   # Manage overlaps, starting with the correlation column (2)
   col <- 2
   repeat {
-    result <- process_peptides(col)
-    current_overlaps <- result$overlap_peptides
-    meta_hmap <- result$meta_hmap
-    if (length(current_overlaps) == 0) {
-      break
-    }
-    peptide_indices <- current_overlaps
-    # If more overlaps remain, add another correlation column
+    sv <- rep(NA_real_, nrow(meta_hmap))
+    res <- process_peptides(col, sv)
+    meta_hmap <- res$meta_hmap
+    samples_cols[[length(samples_cols)+1]] <- res$samples_vec
+    
+    if (length(res$overlap_peptides) == 0) break
+    peptide_indices <- res$overlap_peptides
     col <- ncol(meta_hmap) + 1
     meta_hmap <- cbind(meta_hmap, NA)
     colnames(meta_hmap)[col] <- paste("Correlation", col - 2)
@@ -335,9 +323,7 @@ interpro_plot <- function(ioi, interpro_ioi_sele = NULL, interpro_file, uniprot_
       }
     }
   }
-  # We now have: 
-  # "Amino acid residue", "Olink target correlation", maybe more "Correlation X" columns, and domain columns.
-  
+
   # Convert this to numeric
   meta_hmap[,"Olink target correlation"] <- as.numeric(meta_hmap[,"Olink target correlation"])
   
@@ -380,18 +366,22 @@ interpro_plot <- function(ioi, interpro_ioi_sele = NULL, interpro_file, uniprot_
   # }
   # cat_color_mapping <- setNames(interpro_colors[1:n_cats], all_categories)
   # 
+  
+  samples_mat <- do.call(cbind, samples_cols)
+  mode(samples_mat) <- "numeric"
+  colnames(samples_mat) <- colnames(cor_mat)
+  rownames(samples_mat) <- rownames(cor_mat)
   # Prepare hover text
   # Hover: residue number, correlation, feature category
-  hover_text <- matrix(nrow = dim(cor_mat)[1], ncol = dim(cor_mat)[2])
-  
+  hover_text <- matrix(nrow = nrow(cor_mat), ncol = ncol(cor_mat))
   colnames(hover_text) <- colnames(cor_mat)
-  for(j in colnames(cor_mat)){
-    
-    hover_text[,j] <- paste0("Residue: ", meta_hmap[,"Amino acid residue"],
-                             "<br>Correlation: ", round(cor_mat[,j], 3),
-                             "<br>Feature: ", feature_category,
-                              "<br>Samples in comparison: ", peptide_seq_list$N) #Fix similar to domains so its accurate per peptide
-    
+  for (j in seq_len(ncol(cor_mat))) {
+    hover_text[, j] <- paste0(
+      "Residue: ", meta_hmap[,"Amino acid residue"],
+      "<br>Correlation: ", round(cor_mat[, j], 3),
+      "<br>Feature: ", feature_category,
+      "<br>Samples in comparison: ", samples_mat[, j]
+    )
   }
   
   # row_side_colors: we can provide a data frame with one column: feature_category
@@ -1302,7 +1292,7 @@ z-index: 999999 !important;
                                h3("Welcome to PeptAffinity"),
                                p("Explore correlations between peptides quantified by MS and their corresponding Olink assays across protein sequences and structures using interactive visualizations."),
                                p("• ‘Sequence’ – heatmap visualizing MS-Olink correlations for peptides mapped along the protein sequence, with associated protein domains and features"),
-                               p("• ‘Structure’ – AlphaFold model of the protein structure, coloured by median MS-Olink correlation for detected peptides"),
+                               p("• ‘Structure’ – AlphaFold model of the protein structure, colored by median MS-Olink correlation for detected peptides"),
                                p("• ‘All proteins’ – global summary of the dataset"),
                                p("Select a protein of interest in the left panel. Use the filters to narrow down the list of proteins based on correlation thresholds.")
                         )
@@ -1324,7 +1314,7 @@ z-index: 999999 !important;
                             size = "sm"
                           ),
                           icon("info-circle", class = "info-icon", id = "detailed_info",
-                               title = "Here, we show the selected isoform with features from the InterPro or Prosite databases and the correlations of all mapped MS peptides to the corresponding Olink assay. Peptides covering the same position on the primary sequence are separated into multiple rows.",
+                               title = "Here, we show the selected isoform with features from the InterPro or Prosite databases and the correlations of all mapped MS peptides to the corresponding Olink assay. Peptides covering the same position on the primary sequence are separated into multiple rows. The top shows kernel density of MS peptides in each category, the middle shows the domains, and the bottom shows the correlation values.",
                                `data-toggle` = "tooltip")
                           
                           
@@ -1337,14 +1327,14 @@ z-index: 999999 !important;
                         )
                       )
              ),
-    #          
+            
              tabPanel("Structure",
                       fluidRow(
                         column(12,
 
                                span("Alphafold Structural Data", class = "plot-title"),
                                icon("info-circle", class = "info-icon", id = "alphafold_info",
-                                    title = "This plot shows median correlation to a paired olink assay for peptides quantified by MS, visualized across the protein structure for the selected uniprot ID. The 3D model was created using alphafold (obtained from https://alphafold.ebi.ac.uk/ which has a CC BY 4.0 license). Colored 3D structures represent detected peptides from the MS data, while a grey chain backbone represents the entire protein. The results do not imply separate structural entities, they simply represent median correlations and the mapping of these values.",
+                                    title = "This plot shows median correlation to a paired Olink assay for peptides quantified by MS, visualized across the protein structure for the selected UniProt ID. The 3D model was created using AlphaFold (obtained from https://alphafold.ebi.ac.uk/ which has a CC BY 4.0 license). Colored 3D structures represent detected peptides from the MS data, while a grey chain backbone represents the entire protein. The results do not imply separate structural entities, they simply represent median correlations between MS peptides and corresponding Olink assays, and the mapping of these values on the structure.",
                                     `data-toggle` = "tooltip")
                         )
                       ),
@@ -1411,14 +1401,14 @@ z-index: 999999 !important;
                         column(12,
                                span("Summary of Filtered Results", class = "plot-title"),
                                icon("info-circle", class = "info-icon", id = "summary_info",
-                                    title = "These results present overall MS-Olink peptide correlations for each protein in the dataset. Use this tab to get an overview of the dataset and to inform filter selections for detailed explorations.",
+                                    title = "These results present overall MS peptide-Olink assay correlations for each protein in the dataset. Use this tab to get an overview of the dataset and to inform filter selections for detailed explorations.",
                                     `data-toggle` = "tooltip")
                         )
                       ),
-                      br(),
-                      fluidRow(
-                        column(12, withSpinner(plotOutput("summary_plot", height = "300px"), type = 4))
-                      ),
+                      # br(),
+                      # fluidRow(
+                      #   column(12, withSpinner(plotOutput("summary_plot", height = "300px"), type = 4))
+                      # ),
                       
                       br(),
                       
@@ -1491,8 +1481,8 @@ server <- function(input, output, session) {
     summarise(
       mean_corr = mean(correlation, na.rm = TRUE),
       sd_corr = sd(correlation, na.rm = TRUE),
-      median_corr = median(correlation, na.rm = TRUE),
-      iqr_corr = IQR(correlation, na.rm = TRUE),
+      median_corr = (max(correlation, na.rm = TRUE) + min(correlation, na.rm = TRUE))/2, #NOT MEDIAN TESTING
+      iqr_corr = max(correlation, na.rm = TRUE) - min(correlation, na.rm = TRUE), #NOT IQR TESTING 
       n_peptides = n(),
       n_isoforms = length(unique(unlist(strsplit(paste(UniProt.MS, collapse = ";"), ";"))))
     )
@@ -1906,8 +1896,8 @@ tip.style.top  =  (y + 8) + 'px';
         toImageButtonOptions = list(
           format = "svg",
           filename = paste0('heatmap_', input$selected_result),
-          width = 800,
-          height = 300
+          width = 1200,
+          height = 650
         )
       )
   })
