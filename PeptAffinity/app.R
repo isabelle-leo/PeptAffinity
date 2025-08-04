@@ -1413,8 +1413,8 @@ z-index: 999999 !important;
                       br(),
                       
                       fluidRow(
-                        column(6, withSpinner(plotlyOutput("volcano_plot", height = "300px"), type = 4)),
-                        column(6, withSpinner(plotlyOutput("volcano_plot2", height = "300px"), type = 4))
+                        column(6, withSpinner(plotlyOutput("volcano_plot", height = "500px"), type = 4)),
+                        column(6, withSpinner(plotlyOutput("volcano_plot2", height = "500px"), type = 4))
                       )
              )
            )
