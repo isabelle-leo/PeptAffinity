@@ -1,14 +1,14 @@
-# **PeptOlink**
+# **PeptAffinity**
 
 *A Shiny app for exploring the relationship between MS–derived peptide intensities and paired Olink assays.*
 
 Read the preprint here: https://www.researchsquare.com/article/rs-6501601/v1
 
-PeptOlink maps peptides detected in plasma proteomics data by MS onto their parent protein sequences, annotates isoforms and features (InterPro/Prosite domains, structural features), and visualizes correlations between peptide abundances and Olink assay measurements. This helps identify regions of a protein driving Olink assay signals, and might highlight structural or domain hotspots of functional relevance in the plasma proteome.
+PeptAffinity maps peptides detected in plasma proteomics data by MS onto their parent protein sequences, annotates isoforms and features (InterPro/Prosite domains, structural features), and visualizes correlations between peptide abundances and Olink assay measurements. This helps identifying regions of a protein that correlate to Olink assay measurements, and might highlight structural or domain hotspots of functional relevance in the plasma proteome.
 
 **Getting started**
 
-The app can be accessed at: https://peptolink.serve.scilifelab.se/
+The app can be accessed at: https://peptaffinity.serve.scilifelab.se/
 
 **Using the app code**
 
@@ -20,9 +20,9 @@ The app is organized by: setup section, functions section, app section. Constant
 
 Filters panel:
 
-* Correlation Threshold (≤): Upper limit for peptide‑Olink correlation
+* Peptide Correlation: Range of peptide‑Olink correlations (based on mean or median peptide correlation per protein)
 
-* Spread Threshold (≥): Minimum variability (SD/IQR) across samples
+* Peptide Correlation Spread: Range for the variance across samples (based on standard deviation - SD - or interquartile range - IQR)
 
 * Peptides (≥): Minimum number of distinct peptides per gene ID
 
@@ -32,25 +32,31 @@ Filters panel:
 * The filter panel updates values automatically
 * The tab retracts when you click again
 
-Feature tab:
+Home tab:
+
+* Here you can find the tabs' structure for the app
+
+Sequence tab:
 
 * Select Gene & Isoform: Choose a gene symbol and its UniProt isoform
 
 * Domain Source: Toggle between InterPro and Prosite annotations
 
-* Interactive Heatmap: Rows show peptides mapped along sequence; color scale indicates correlation value between MS abundance and Olink
+* Interactive Heatmap of the protein: Rows show peptides mapped along sequence; color scale indicates correlation between MS abundance and Olink NPX values
 
 * Tooltips: Hover on any tile to see residue position, correlation, and feature annotation
 
-Structural Tab: *coming soon*
+Structure tab:
 
-Summary tab:
+* Click "Spin" in order to rotate the structure 
+
+* Interactive AlphaFold structure of the protein: the color scale indicates median peptide correlation between MS abundance and Olink NPX values
+
+All proteins tab:
 
 * Use this tab to guide your selections in the filter panel and to see how much of the dataset meets your parameters
 
-* Violin & Jitter: Distribution of all individual peptide correlations across the filtered set of gene IDs.
-
-* Scatter plots: Mean vs. SD and median vs. IQR plots for gene ID‑level statistics
+* Scatter plots: Mean vs. SD and center vs. range plots for gene ID‑level statistics
 
 # Our preprint (please cite if you use our app): [https://www.researchsquare.com/article/rs-6501601/v1](https://doi.org/10.21203/rs.3.rs-6501601/v1)
 
