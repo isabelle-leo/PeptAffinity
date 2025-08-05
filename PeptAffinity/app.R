@@ -227,30 +227,46 @@ get_peptide_and_correlation_numeric <- function(fasta_list, peptide_seq_list, ex
   return(peptide_indices)
 }
 
-interpro_plot <- function(ioi, interpro_ioi_sele = NULL, interpro_file, uniprot_ids, peptide_seq_list_file = NULL, fasta_file = NULL, abundance_file = NULL, abundance_column = "quant",
+interpro_plot <- function(ioi, interpro_ioi_sele = NULL, interpro_file, working_dt, fasta_file = NULL, abundance_file = NULL, abundance_column = "quant",
                           correlation_palette = sapply(seq(-1, 1, length.out = 100), correlation_palette_function), 
                           interpro_colors = c("#FF5376", "#72AFD9", "#E3D26F", "#A288E3", "#1B5299", "#68D8D6", "#B78DA3")) {
   
   interpro_ioi <- readRDS(interpro_file)
   if(!is.null(interpro_ioi_sele)){
-    
     interpro_ioi <- interpro_ioi[interpro_ioi$uniprot == interpro_ioi_sele & 
                                    !is.null(interpro_ioi$description) & 
                                    !is.na(interpro_ioi$description),]
-    
-  }else {interpro_ioi <- interpro_ioi[interpro_ioi$hgnc_symbol == ioi & 
-                                        !is.null(interpro_ioi$description) & 
-                                        !is.na(interpro_ioi$description),]
+  } else {
+    interpro_ioi <- interpro_ioi[interpro_ioi$hgnc_symbol == ioi & 
+                                   !is.null(interpro_ioi$description) & 
+                                   !is.na(interpro_ioi$description),]
   }
   
-  ioi_alphafold <- tryCatch({get_alphafold_file(ioi, uniprot_ids)},
-                            error = function(e){0})
+  # Verify FASTA handling
+  unique_fastas <- unique(working_dt$fasta)
   
-  # Get fasta seq from plasma_data_FASTA_by_gene.RDS (pass as fasta_file)
-  fasta_list <- unique(fasta_file$fasta[fasta_file$Gene.Name == ioi])
+  if (length(unique_fastas) > 1) {
+    warning(paste("Multiple FASTA sequences found for gene", ioi, "- using first one"))
+  }
   
-  peptide_seq_list <- readRDS(peptide_seq_list_file)
-  peptide_seq_list <- peptide_seq_list[[ioi]]
+  if (length(unique_fastas) == 0) {
+    stop("No FASTA sequence found for the selected gene/isoform")
+  }
+  
+  fasta_list <- unique_fastas[1]  # Single sequence, not a list
+  
+  # Extract and clean peptides from working_dt
+  peptide_seq_list <- data.frame(
+    peptides = clean_peptide_sequence(working_dt$Peptide.sequence),
+    id = working_dt$Gene.Name,
+    target_correlation = working_dt$Correlation,
+    N = working_dt$N,
+    stringsAsFactors = FALSE
+  )
+  peptide_seq_list <- peptide_seq_list[!duplicated(peptide_seq_list$peptides), ]
+  
+  peptide_indices <- tryCatch({get_peptide_and_correlation_numeric(fasta_list, peptide_seq_list)},
+                              error = function(e){0})
   peptide_indices <- tryCatch({get_peptide_and_correlation_numeric(fasta_list, peptide_seq_list)},
                               error = function(e){0})
   
@@ -565,21 +581,31 @@ interpro_plot <- function(ioi, interpro_ioi_sele = NULL, interpro_file, uniprot_
 }
 
 
-jenks_density_plot <- function(ioi, peptide_seq_list_file, uniprot_ids, fasta_file = NULL) {
+jenks_density_plot <- function(ioi, working_dt, fasta_file = NULL) {
   library(ggplot2)
   library(dplyr)
   
-  # Load peptide sequences for the gene of interest
-  peptide_seq_list <- readRDS(peptide_seq_list_file)
-  if (!ioi %in% names(peptide_seq_list)) {
-    stop("IOI not found in peptide_seq_list.")
+  unique_fastas <- unique(working_dt$fasta)
+  
+  if (length(unique_fastas) > 1) {
+    warning(paste("Multiple FASTA sequences found for gene", ioi, "- using first one"))
   }
   
-  gene_peptides <- peptide_seq_list[[ioi]]
+  if (length(unique_fastas) == 0) {
+    stop("No FASTA sequence found")
+  }
   
+  fasta_seq <- unique_fastas[1]
   
-  # Get FASTA sequence from plasma_data_FASTA_by_gene.RDS (pass in fasta_file)
-  fasta_seq <- unique(fasta_file$fasta[fasta_file$Gene.Name == ioi])
+  # Extract and clean peptides from working_dt
+  gene_peptides <- data.frame(
+    peptides = clean_peptide_sequence(working_dt$Peptide.sequence),
+    id = working_dt$Gene.Name,
+    target_correlation = working_dt$Correlation,
+    N = working_dt$N,
+    stringsAsFactors = FALSE
+  )
+  gene_peptides <- gene_peptides[!duplicated(gene_peptides$peptides), ]
   
   jenks_df <- gene_peptides %>% 
     mutate(peptide_id = row_number()) %>% 
@@ -674,8 +700,8 @@ jenks_density_plot <- function(ioi, peptide_seq_list_file, uniprot_ids, fasta_fi
 
 
 # Combined Plot Function
-combined_interpro_density_plot <- function(ioi, interpro_file, uniprot_ids, interpro_ioi_sele = NULL,
-                                           peptide_seq_list_file = NULL, fasta_file = NULL, 
+combined_interpro_density_plot <- function(ioi, interpro_file, interpro_ioi_sele = NULL,
+                                           working_dt, fasta_file = NULL, 
                                            abundance_file = NULL, abundance_column = "quant",
                                            correlation_palette = sapply(seq(-1, 1, length.out = 100), correlation_palette_function), 
                                            interpro_colors = c("#FF5376", "#72AFD9", "#E3D26F", 
@@ -686,31 +712,18 @@ combined_interpro_density_plot <- function(ioi, interpro_file, uniprot_ids, inte
     ioi = ioi,
     interpro_file = interpro_file,
     interpro_ioi_sele = interpro_ioi_sele,
-    uniprot_ids = uniprot_ids,
-    peptide_seq_list_file = peptide_seq_list_file,
-    fasta_file = fasta_file,
+    working_dt = working_dt,
     abundance_file = abundance_file,
     abundance_column = abundance_column,
     correlation_palette = correlation_palette,
-    interpro_colors = interpro_colors)} else{heatmap_plot <- interpro_plot(
-      ioi = ioi,
-      interpro_file = interpro_file,
-      uniprot_ids = uniprot_ids,
-      peptide_seq_list_file = peptide_seq_list_file,
-      fasta_file = fasta_file,
-      abundance_file = abundance_file,
-      abundance_column = abundance_column,
-      correlation_palette = correlation_palette,
-      interpro_colors = interpro_colors
-    )
+    interpro_colors = interpro_colors
+  )
     }
   
   # Generate the Density Plot using ggplot2
   density_plot_gg <- jenks_density_plot(
     ioi = ioi,
-    peptide_seq_list_file = peptide_seq_list_file,
-    uniprot_ids = uniprot_ids,
-    fasta_file = fasta_file
+    working_dt = working_dt
   )
   
   # Convert ggplot2 Density Plot to Plotly Object
@@ -896,16 +909,37 @@ map_correlation_to_color <- function(corr_values, palette = sapply(seq(-1, 1, le
 }
 
 alphafold_plot <- function(ioi, genesymb, uniprot_ids, 
-                           peptide_seq_list_file = NULL, 
+                           working_dt,
                            fasta_file = NULL, 
                            correlation_palette = sapply(seq(-1, 1, length.out = 100), correlation_palette_function)) {
-  # Load peptide sequence list for the isoform
-  if (!is.null(peptide_seq_list_file)) {
-    peptide_seq_list <- readRDS(peptide_seq_list_file)
-    peptide_seq_list <- peptide_seq_list[[genesymb]]
-  } else {
-    stop("No peptide membership data provided.")
+  
+  #Add stop condition for peptide filter failure
+  if (is.null(working_dt) || nrow(working_dt) == 0) {
+    stop("No peptide data matches filter conditions")
   }
+  
+  # Ensure fastas are valid from server processing
+  unique_fastas <- unique(working_dt$fasta)
+  
+  if (length(unique_fastas) > 1) {
+    warning(paste("Multiple FASTA sequences found for isoform", ioi, "- using first one"))
+  }
+  
+  if (length(unique_fastas) == 0) {
+    stop("No FASTA sequence found for the selected isoform")
+  }
+  
+  fasta_seq <- unique_fastas[1]
+  
+  # Extract and clean peptides from working_dt
+  peptide_seq_list <- data.frame(
+    peptides = clean_peptide_sequence(working_dt$Peptide.sequence),
+    id = working_dt$Gene.Name,
+    target_correlation = working_dt$Correlation,
+    N = working_dt$N,
+    stringsAsFactors = FALSE
+  )
+  peptide_seq_list <- peptide_seq_list[!duplicated(peptide_seq_list$peptides), ]
   
   # Get the AlphaFold structure file using the isoform directly
   ioi_alphafold <- tryCatch({
@@ -918,15 +952,6 @@ alphafold_plot <- function(ioi, genesymb, uniprot_ids,
   
   if (ioi_alphafold[["status_code"]] == 404) {
     stop("No AlphaFold structure was found for this ID of interest.")
-  }
-  
-  # Obtain FASTA sequence: either from file or via AlphaFold retrieval
-  if (!is.null(fasta_file)) {
-    fasta_list <- readRDS(fasta_file)
-    # Assume fasta_list is a named list with ioi as key
-    fasta_seq <- fasta_list[[ioi]]
-  } else {
-    fasta_seq <- get_FASTA_fromalphafold(ioi_alphafold)
   }
   
   # Process peptides to get indices and correlation values
@@ -1027,6 +1052,12 @@ color_scale_plot <- function(correlation_palette, n_bins = 100) {
     labs(x = "Correlation", fill = NULL)
   
   return(p)
+}
+
+# Helper: Clean mods from the full peptide list on the fly
+clean_peptide_sequence <- function(peptide_seq) {
+  # Pattern: remove + followed by numbers and decimal point
+  gsub("\\+[0-9]+\\.[0-9]+", "", peptide_seq)
 }
 
 #Google analytics server function
@@ -1202,9 +1233,15 @@ z-index: 999999 !important;
 }
 
 .btn-warning,
-.btn-warning:hover,
+.btn-warning:hover {
+  background-color: #FFE6C9 !important;
+  transform: scale(1.04);               /* Subtle zoom */
+  box-shadow: 0 0 3px #E2D3F1;          /* Soft glow ring */
+  color: #333 !important;
+}
+
 .btn-warning:focus {
-  background-color: #FFE6C9 !important;   /* light orange */
+  background-color: #FCD19F !important;   /* light orange */
   border-color:    #FFE6C9 !important;
   color: #333 !important;
 }
@@ -1329,8 +1366,8 @@ z-index: 999999 !important;
                      circle  = FALSE,
                      inline  = TRUE,
                      sliderInput(
-                       "n_samples_detected", "Samples detected",
-                       min = 0, max = 100, value = c(0, 100), step = 1
+                       "n_samples_detected", "Samples with peptide",
+                       min = 16, max = 88, value = c(16, 88), step = 1
                      )
                    )
                ),
@@ -1375,6 +1412,13 @@ z-index: 999999 !important;
                         )
                       ),
                       br(),
+                      fluidRow(
+                        column(12,
+                               div(style = "display: flex; justify-content: center;",
+                                   uiOutput("detailed_warn")
+                               )
+                        )
+                      ),
                       fluidRow(
                         column(12,
                                withSpinner(plotlyOutput("detailed_plot", height = "800px"), type = 4) 
@@ -1536,8 +1580,8 @@ server <- function(input, output, session) {
     summarise(
       mean_corr = mean(correlation, na.rm = TRUE),
       sd_corr = sd(correlation, na.rm = TRUE),
-      center_corr = (max(correlation, na.rm = TRUE) + min(correlation, na.rm = TRUE))/2, #NOT MEDIAN TESTING
-      range_corr = max(correlation, na.rm = TRUE) - min(correlation, na.rm = TRUE), #NOT IQR TESTING 
+      center_corr = (max(correlation, na.rm = TRUE) + min(correlation, na.rm = TRUE))/2, 
+      range_corr = max(correlation, na.rm = TRUE) - min(correlation, na.rm = TRUE), 
       n_peptides = n(),
       n_isoforms = length(unique(unlist(strsplit(paste(UniProt.MS, collapse = ";"), ";"))))
     )
@@ -1672,6 +1716,29 @@ server <- function(input, output, session) {
     dt
   })
   
+  filtered_peptide_list <- reactive({
+    req(input$selected_result)
+    req(working_plasma_dt())
+    
+    dt <- working_plasma_dt()
+    if (nrow(dt) == 0) return(NULL)
+    
+    # Create a peptide list structure from the filtered data
+    # Clean the peptides on-the-fly
+    peptide_df <- data.frame(
+      peptides = clean_peptide_sequence(dt$Peptide.sequence),
+      id = dt$Gene.Name,
+      target_correlation = dt$Correlation,
+      N = dt$N,
+      stringsAsFactors = FALSE
+    )
+    
+    # Remove duplicates if any (important since cleaning might create duplicates)
+    peptide_df <- peptide_df[!duplicated(peptide_df$peptides), ]
+    
+    return(peptide_df)
+  })
+  
   #Plots -----
   
   output$summary_plot <- renderPlot({
@@ -1752,8 +1819,8 @@ server <- function(input, output, session) {
       alphafold_plot(
         ioi = input$selected_isoforms, 
         genesymb = input$selected_result, 
-        uniprot_ids = working_plasma_dt(), 
-        peptide_seq_list_file = "data/peptide_seq_list.RDS", 
+        uniprot_ids = working_plasma_dt(),
+        working_dt = working_plasma_dt(),
         fasta_file = NULL, 
         correlation_palette = correlation_palette
       ),
@@ -1902,10 +1969,23 @@ tip.style.top  =  (y + 8) + 'px';
   
   
   output$alphafold_warn <- renderUI({
+    if (nrow(working_plasma_dt()) == 0) {
+      return(tags$div("No peptide data matches filter conditions. Please adjust your filter settings.", 
+                      class = "btn-warning"))
+    }
     validate(
       need(ngl_plot_obj(), "No valid AlphaFold structure file returned for this ID of interest.")
     )
     NULL  })
+  
+  output$detailed_warn <- renderUI({
+    # Check if we have data after filtering
+    if (nrow(working_plasma_dt()) == 0) {
+      return(tags$div("No peptide data matches filter conditions. Please adjust your filter settings.", 
+                      class = "btn-warning"))
+    }
+    NULL
+  })
   
   # Render the color scale only if the NGL plot is produced.
   output$color_scale <- renderPlot({
@@ -1944,13 +2024,11 @@ tip.style.top  =  (y + 8) + 'px';
       ioi = input$selected_result,
       interpro_file = domain_file,
       interpro_ioi_sele = input$selected_isoforms,
-      uniprot_ids = working_plasma_dt(),  
-      peptide_seq_list_file = "data/peptide_seq_list.RDS",
-      fasta_file = working_plasma_dt(),
+      working_dt = working_plasma_dt(),  # Pass the filtered data directly
       abundance_file = NULL, 
       abundance_column = "quant",
-      correlation_palette =  sapply(seq(-1, 1, length.out = 100), correlation_palette_function),
-      interpro_colors = c("#a7a6ba") #the REAL colors! Other function passes into this one for combined plot!!
+      correlation_palette = sapply(seq(-1, 1, length.out = 100), correlation_palette_function),
+      interpro_colors = c("#a7a6ba")
     ) |> 
       config(
         # add download button
