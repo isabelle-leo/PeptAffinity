@@ -1285,7 +1285,7 @@ z-index: 999999 !important;
                      inline = TRUE,
                      #label = "Correlation Measure:",
                      label = NULL,
-                     choices = c("Mean" = "mean", "Center" = "center"),
+                     choices = c("Mean" = "mean", "Median" = "median" , "Center" = "center"),
                      selected = "mean",
                      animation = "pulse"
                    )
@@ -1308,7 +1308,7 @@ z-index: 999999 !important;
                      inline = TRUE,
                      #label = "Spread Measure:",
                      label = NULL,
-                     choices = c("SD" = "sd", "Range" = "range"),
+                     choices = c("SD" = "sd", "IQR" = "iqr", "Range" = "range"),
                      selected = "sd",
                      animation = "pulse"
                    )
@@ -1405,7 +1405,7 @@ z-index: 999999 !important;
                             size = "sm"
                           ),
                           icon("info-circle", class = "info-icon", id = "detailed_info",
-                               title = "Here, we show the selected isoform with features from the InterPro or Prosite databases and the correlations of all mapped MS peptides to the corresponding Olink assay. Peptides covering the same position on the primary sequence are separated into multiple rows. The top shows kernel density of MS peptides in each category, the middle shows the domains, and the bottom shows the correlation values.",
+                               title = "Here, we show the selected isoform with features from the InterPro or Prosite databases and the correlations of all mapped MS peptides to the corresponding Olink assay. Peptides covering the same position on the primary sequence are separated into multiple rows. The top shows kernel density of MS peptides in each category, the middle shows the domains, and the bottom shows the correlation values. The data shown in this plot can be adjusted using the dropdown filters for peptides.",
                                `data-toggle` = "tooltip")
                           
                           
@@ -1432,7 +1432,7 @@ z-index: 999999 !important;
 
                                span("Alphafold Structural Data", class = "plot-title"),
                                icon("info-circle", class = "info-icon", id = "alphafold_info",
-                                    title = "This plot shows median correlation to a paired Olink assay for peptides quantified by MS, visualized across the protein structure for the selected UniProt ID. The 3D model was created using AlphaFold (obtained from https://alphafold.ebi.ac.uk/ which has a CC BY 4.0 license). Colored 3D structures represent detected peptides from the MS data, while a grey chain backbone represents the entire protein. The results do not imply separate structural entities, they simply represent median correlations between MS peptides and corresponding Olink assays, and the mapping of these values on the structure.",
+                                    title = "This plot shows median correlation to a paired Olink assay for peptides quantified by MS, visualized across the protein structure for the selected UniProt ID. The 3D model was created using AlphaFold (obtained from https://alphafold.ebi.ac.uk/ which has a CC BY 4.0 license). Colored 3D structures represent detected peptides from the MS data, while a grey chain backbone represents the entire protein. The results do not imply separate structural entities, they simply represent median correlations between MS peptides and corresponding Olink assays, and the mapping of these values on the structure. The data shown in this plot can be adjusted using the dropdown filters for peptides.",
                                     `data-toggle` = "tooltip")
                         )
                       ),
@@ -1499,7 +1499,7 @@ z-index: 999999 !important;
                         column(12,
                                span("Summary of Filtered Results", class = "plot-title"),
                                icon("info-circle", class = "info-icon", id = "summary_info",
-                                    title = "These results present overall MS peptide-Olink assay correlations for each protein in the dataset. Use this tab to get an overview of the dataset and to inform filter selections for detailed explorations.",
+                                    title = "These results present overall MS peptide-Olink assay correlations for each protein in the dataset. Use this tab to get an overview of the dataset and to inform filter selections for detailed explorations. The data shown in these plots is by gene ID, it is NOT adjusted using the dropdown filters for peptides.",
                                     `data-toggle` = "tooltip")
                         )
                       ),
@@ -1578,6 +1578,8 @@ server <- function(input, output, session) {
   gene_stats <- correlation_long_filt %>%
     group_by(gene_symbol) %>%
     summarise(
+      median_corr = median(correlation, na.rm = TRUE),
+      iqr_corr = IQR(correlation, na.rm = TRUE),
       mean_corr = mean(correlation, na.rm = TRUE),
       sd_corr = sd(correlation, na.rm = TRUE),
       center_corr = (max(correlation, na.rm = TRUE) + min(correlation, na.rm = TRUE))/2, 
@@ -1599,8 +1601,8 @@ server <- function(input, output, session) {
       input$n_isoforms
     ) 
     
-    corr_col <- if (input$corr_measure == "mean") "mean_corr" else "center_corr"
-    spread_col <- if (input$spread_measure == "sd") "sd_corr" else "range_corr"
+    corr_col <- if (input$corr_measure == "mean") "mean_corr" else if (input$corr_measure == "center") "center_corr" else "median_corr"
+    spread_col <- if (input$spread_measure == "sd") "sd_corr" else if (input$spread_measure == "range") "range_corr" else "iqr_corr"
     
     # Filter genes based on user inputs
     filtered_genes <- gene_stats %>%
