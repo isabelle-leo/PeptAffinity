@@ -31,7 +31,7 @@ library(colorspace)
 #  ____) | |____   | |  | |__| | |     
 # |_____/|______|  |_|   \____/|_|     
 paper_link <- "https://dx.doi.org/10.21203/rs.3.rs-6501601/v1"
-# Sys.setenv(GA_API_SECRET = "12345", GA_MEASUREMENT_ID = "1234") #To fake the variables for testing
+#Sys.setenv(GA_API_SECRET = "12345", GA_MEASUREMENT_ID = "1234") #To fake the variables for testing
 readRenviron("/home/project-vol/.Renviron") #server environment 
 
 font_add_google("Open Sans", "open-sans")  
@@ -228,7 +228,7 @@ get_peptide_and_correlation_numeric <- function(fasta_list, peptide_seq_list, ex
 }
 
 interpro_plot <- function(ioi, interpro_ioi_sele = NULL, interpro_file, uniprot_ids, peptide_seq_list_file = NULL, fasta_file = NULL, abundance_file = NULL, abundance_column = "quant",
-                          correlation_palette = c("red", "gray", "blue"), 
+                          correlation_palette = sapply(seq(-1, 1, length.out = 100), correlation_palette_function), 
                           interpro_colors = c("#FF5376", "#72AFD9", "#E3D26F", "#A288E3", "#1B5299", "#68D8D6", "#B78DA3")) {
   
   interpro_ioi <- readRDS(interpro_file)
@@ -497,7 +497,7 @@ interpro_plot <- function(ioi, interpro_ioi_sele = NULL, interpro_file, uniprot_
   }, error = function(e) heatmap)  # return heatmap unchanged if colorbar fails
   }
   # Remove colorbar and legend for domain plot
-  if (!is.null(heatmap$x$data) && length(heatmap$x$data) >= 1 && "showscale" %in% names(heatmap$x$data[[1]])) {
+  if (nrow(interpro_ioi) > 0 && !is.null(heatmap$x$data) && length(heatmap$x$data) >= 1 && "showscale" %in% names(heatmap$x$data[[1]])) {
     heatmap$x$data[[1]]$showscale <- FALSE
   }
   
@@ -527,6 +527,38 @@ interpro_plot <- function(ioi, interpro_ioi_sele = NULL, interpro_file, uniprot_
         tickfont = list(size = 8)
       )
     )
+  
+  if (nrow(interpro_ioi) == 0) { #handle edge case like SERPINA3 small isoform
+    tr <- heatmap$x$data[[1]]                    # correlation trace
+    
+    ## 1) build a proper colourscale --------------------------
+    pal_vec <- correlation_palette               # 100 hex strings
+    pal_len <- length(pal_vec)
+    tr$colorscale <- lapply(
+      seq_len(pal_len),
+      function(i) list((i - 1)/(pal_len - 1), pal_vec[i])
+    )
+
+    tr$autocolorscale <- FALSE
+    tr$showscale      <- TRUE
+    
+
+    tr$zmin  <- -1
+    tr$zmax  <-  1
+    tr$zauto <- FALSE
+    
+
+    tr$coloraxis <- NULL
+    
+    tr$colorbar <- list(
+      title     = list(text = "MS-Olink correlation", font = list(size = 10)),
+      tickfont  = list(size = 8),
+      x = 1, y = 0, yanchor = "bottom",
+      len = 0.40, thickness = 15
+    )
+    
+    heatmap$x$data[[1]] <- tr                    # write back the trace
+  }
   
   return(heatmap)
   
@@ -645,7 +677,7 @@ jenks_density_plot <- function(ioi, peptide_seq_list_file, uniprot_ids, fasta_fi
 combined_interpro_density_plot <- function(ioi, interpro_file, uniprot_ids, interpro_ioi_sele = NULL,
                                            peptide_seq_list_file = NULL, fasta_file = NULL, 
                                            abundance_file = NULL, abundance_column = "quant",
-                                           correlation_palette = c("red", "gray", "blue"), 
+                                           correlation_palette = sapply(seq(-1, 1, length.out = 100), correlation_palette_function), 
                                            interpro_colors = c("#FF5376", "#72AFD9", "#E3D26F", 
                                                                "#A288E3", "#1B5299", "#68D8D6", "#B78DA3")) {
   
@@ -852,7 +884,7 @@ get_residue_correlation_median <- function(fasta_seq, peptide_indices) {
 }
 
 # Helper: Map numeric correlation values to colors using a continuous palette
-map_correlation_to_color <- function(corr_values, palette = c("red", "gray", "blue"), n_bins = 100) {
+map_correlation_to_color <- function(corr_values, palette = sapply(seq(-1, 1, length.out = 100), correlation_palette_function), n_bins = 100) {
   # Create a vector of colors based on the provided palette
   palette_colors <- colorRampPalette(palette)(n_bins)
   # Define breaks assuming correlation values range from -1 to 1
@@ -866,7 +898,7 @@ map_correlation_to_color <- function(corr_values, palette = c("red", "gray", "bl
 alphafold_plot <- function(ioi, genesymb, uniprot_ids, 
                            peptide_seq_list_file = NULL, 
                            fasta_file = NULL, 
-                           correlation_palette = c("red", "gray", "blue")) {
+                           correlation_palette = sapply(seq(-1, 1, length.out = 100), correlation_palette_function)) {
   # Load peptide sequence list for the isoform
   if (!is.null(peptide_seq_list_file)) {
     peptide_seq_list <- readRDS(peptide_seq_list_file)
@@ -1169,6 +1201,14 @@ z-index: 999999 !important;
   box-shadow: 0 0 0 2px #CDB1E8; 
 }
 
+.btn-warning,
+.btn-warning:hover,
+.btn-warning:focus {
+  background-color: #FFE6C9 !important;   /* light orange */
+  border-color:    #FFE6C9 !important;
+  color: #333 !important;
+}
+
   ")),
   titlePanel(
     tags$a(
@@ -1188,7 +1228,7 @@ z-index: 999999 !important;
                # Filters
                dropdownButton(
                  inputId = "filters_dropdown_btn",
-                 label = "Filters",
+                 label = "Protein Filters",
                  icon = icon("sliders-h"),
                  status = "primary",
                  circle = FALSE,
@@ -1279,7 +1319,21 @@ z-index: 999999 !important;
            div(class = "sidebar-section",
                uiOutput("select_result_ui"),
                uiOutput("isoform_count_ui"),
-               uiOutput("isoform_select_ui")
+               uiOutput("isoform_select_ui"),
+               div(class = "sidebar-section",
+                   dropdownButton(
+                     inputId = "peptide_filters_dropdown_btn",
+                     label   = "Peptide filters",
+                     icon    = icon("filter"),
+                     status  = "warning", 
+                     circle  = FALSE,
+                     inline  = TRUE,
+                     sliderInput(
+                       "n_samples_detected", "Samples detected",
+                       min = 0, max = 100, value = c(0, 100), step = 1
+                     )
+                   )
+               ),
            )
     ),
     column(9,
@@ -1456,7 +1510,8 @@ server <- function(input, output, session) {
   purrr::walk(
     c("corr_threshold", "corr_measure",
       "spread_threshold", "spread_measure",
-      "n_peptides",      "n_isoforms"),
+      "n_peptides",      "n_isoforms",
+      "n_samples_detected"),
     ~ track_input(.x, input, cid, send_value = FALSE))
   
   ## 3. help‑icon clicks ---------------------------------------------------
@@ -1537,6 +1592,7 @@ server <- function(input, output, session) {
     updateNumericInput(session, "spread_threshold", value = c(0,1))
     updateNumericInput(session, "n_peptides", value = 1)
     updateNumericInput(session, "n_isoforms", value = 1)
+    updateSliderInput(session, "n_samples_detected", value = c(0, 100))
     
   })
   
@@ -1605,6 +1661,11 @@ server <- function(input, output, session) {
       # pattern <- paste(input$selected_isoforms, collapse="|")
       # dt <- dt[grepl(pattern, UniProt.MS)]
       dt <- dt[UniProt.MS %in% input$selected_isoforms]
+    }
+    
+    if ("N" %in% names(dt) && !is.null(input$n_samples_detected)) {
+      dt <- dt[N >= input$n_samples_detected[1] &
+                 N <= input$n_samples_detected[2]]
     }
     
     # Return a data.table
