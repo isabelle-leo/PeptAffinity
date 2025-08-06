@@ -117,14 +117,15 @@ mako_colors <- mako(5)
 
 # For UI general theme settings (specific classes defined in the app UI)
 my_theme <- bs_theme(
-  version = 4,
-  bootswatch = "flatly",
+  version = 5,
   base_font = font_google("Open Sans"),
-  heading_font = font_google("Open Sans"),
   primary = "#FF876F",
   fg = '#4F0433', 
   bg = "#fff",
   "font-size-base" = "0.9rem"
+  heading_font = font_google("Chakra Petch"),
+  `enable-rounded` = TRUE,
+  bootswatch = "flatly"
 )
 
 # Load the data
@@ -1143,123 +1144,433 @@ track_input <- function(id,
 
 ui <- fluidPage(
   theme = my_theme,
+  useShinyjs(),
   tags$head(
     tags$link(rel = "stylesheet", href = "https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&display=swap"),
-    tags$link(rel = "icon", type = "image/png", href = "icon.png")
-  ),
-  tags$script(HTML("$(function(){ $('[data-toggle=\"tooltip\"]').tooltip(); });
-  // emit a Shiny input every time an info icon is clicked
-  $(document).on('click', '.info-icon', function () {
-    const section = $(this).attr('id') || 'unknown';
-
-    // priority:'event' fires even if user clicks the same icon twice in a row
-    Shiny.setInputValue('got_help', section, {priority: 'event'});
-  });")),
-  tags$style(HTML("
-h1, h2, h3, h4 {
-      font-family: 'Chakra Petch', cursive;
-      color: #ff5c8d; /* Vibrant pink-orange color */
-}
-    .shiny-plot-output, .plotly {
-        border-radius: 15px;
-        overflow: hidden;
-    }
-      .nav-tabs + .tab-content {
-      background-color: #fff;
-      padding: 15px; /* for spacing */
+    tags$link(rel = "icon", type = "image/png", href = "icon.png"),
+    tags$script(HTML("
+      $(function(){ $('[data-toggle=\"tooltip\"]').tooltip(); });
+      // emit a Shiny input every time an info icon is clicked
+      $(document).on('click', '.info-icon', function () {
+        const section = $(this).attr('id') || 'unknown';
+        Shiny.setInputValue('got_help', section, {priority: 'event'});
+      });
+    ")),
+    tags$style(HTML("
+      /* Main gradient background */
+      body {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
       }
-    .nav-tabs .nav-item .nav-link.active {
-      background-color: #FEEEEB;
-      border-color: #fff;
-    }
-    .info-icon {
-      font-size: 0.9em; 
-      color: #666; 
-      margin-left: 5px; 
-      cursor: help;
-    }
-    .plot-title {
-      font-size: 1rem; 
-      font-weight: 600;
-      margin-bottom: 0.5em;
-    }
-    .sidebar-section {
-      margin-bottom: 15px;
-    }
-    /* Make sure the shinyWidgets dropdown sits above the NGL tooltip */
-.btn-group.shinyWidgets-dropdown .dropdown-menu {
-z-index: 999999 !important;
-}
-.domain-toggle {
-  display: flex; 
-  justify-content: flex-start; /* left-align the row */
-  margin-bottom: 10px;
-}
-  .paper-link { text-decoration:none; color: #ff5c8d; /* Vibrant pink-orange color */}
-  .paper-link:hover { text-decoration:underline; cursor:pointer; }
-  
-.domain-toggle .btn-group {
-  display: flex;
-  gap: 5px; /* space between buttons */
-}
-
-.domain-toggle .btn {
-  background-color: #F4EDFA !important; /* Pastel purple normal */
-  color: #333 !important;
-  border: 1px solid #D3B8ED !important;
-  transition: transform 0.2s ease-in-out;
-  font-weight: 500;
-}
-
-/* Hover effect */
-.domain-toggle .btn:hover {
-  background-color: #E2D3F1 !important; /* Slightly darker pastel purple on hover */
-  transform: scale(1.04);               /* Subtle zoom */
-  box-shadow: 0 0 3px #E2D3F1;          /* Soft glow ring */
-}
-
-/* Active button (radioGroupButtons uses .btn-group-toggle + .btn.active) */
-.domain-toggle .btn-group-toggle .btn.active {
-  background-color: #4F0433 !important; /* Deeper purple to indicate selected */
-  color: #fff !important;
-  box-shadow: 0 0 0 2px #CDB1E8;        /* Outline ring */
-}
-
-/* Also handle :focus or :active states for the moment of click */
-.domain-toggle .btn:focus,
-.domain-toggle .btn:active {
-  outline: none;
-  box-shadow: 0 0 0 2px #CDB1E8; 
-}
-
-.btn-warning,
-.btn-warning:hover {
-  background-color: #FFE6C9 !important;
-  transform: scale(1.04);               /* Subtle zoom */
-  box-shadow: 0 0 3px #E2D3F1;          /* Soft glow ring */
-  color: #333 !important;
-}
-
-.btn-warning:focus {
-  background-color: #FCD19F !important;   /* light orange */
-  border-color:    #FFE6C9 !important;
-  color: #333 !important;
-}
-
-  ")),
-  titlePanel(
-    tags$a(
-      "PeptAffinity",
-      href   = paper_link,  # ← replaces automatically (see setup section)
-      id     = "paper_link_header",
-      target = "_blank",          # open in new tab
-      class  = "paper-link",
-      title  = "Click to read the preprint 💖 © 2025 built by Isabelle Leo Noora Sissala and Haris Babačić",  # native tooltip
-      onclick = "Shiny.setInputValue('went_paper','header',{priority:'event'});"
-    ),
-    windowTitle = "PeptAffinity"
+      
+      /* Glass morphism container */
+      .container-fluid {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        margin: 20px;
+        padding: 30px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+      }
+      
+      /* Typography */
+      h1, h2, h3, h4 {
+        font-family: 'Chakra Petch', sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        font-weight: 700;
+      }
+      
+      /* Animated header */
+      .app-header {
+        text-align: center;
+        padding: 30px 0;
+        position: relative;
+        overflow: hidden;
+      }
+      
+      .app-title {
+        font-size: 3.5rem;
+        font-weight: 700;
+        margin: 0;
+        animation: float 3s ease-in-out infinite;
+        position: relative;
+        z-index: 1;
+      }
+      
+      @keyframes float {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-10px); }
+      }
+      
+      /* Animated molecules background */
+      .molecule {
+        position: absolute;
+        width: 40px;
+        height: 40px;
+        background: radial-gradient(circle, rgba(102,126,234,0.4) 0%, transparent 70%);
+        border-radius: 50%;
+        animation: molecule-float 20s infinite ease-in-out;
+      }
+      /* Card design for sections */
+      .content-card {
+        background: white;
+        border-radius: 15px;
+        padding: 25px;
+        margin-bottom: 20px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+        border: 1px solid rgba(102,126,234,0.1);
+      }
+      
+      .content-card:hover {
+        box-shadow: 0 12px 48px rgba(102,126,234,0.15);
+      }
+      
+      /* Sidebar styling */
+      .sidebar-card {
+        background: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(250,250,255,0.9) 100%);
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 15px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+        border: 1px solid rgba(102,126,234,0.2);
+      }
+      
+      .sidebar-card:hover {
+        border-color: rgba(102,126,234,0.4);
+        box-shadow: 0 6px 30px rgba(102,126,234,0.1);
+      }
+      
+      /* Animated buttons */
+      .btn-gradient {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white !important;
+        border: none;
+        border-radius: 25px;
+        padding: 10px 25px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+      }
+      
+      .btn-gradient::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+        transition: left 0.5s;
+      }
+      
+      .btn-gradient:hover::before {
+        left: 100%;
+      }
+      
+      .btn-gradient:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(102,126,234,0.3);
+      }
+      
+      /* Tab styling */
+      .nav-tabs {
+        border: none;
+        background: rgba(255,255,255,0.8);
+        border-radius: 15px;
+        padding: 5px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+      }
+      
+      .nav-tabs .nav-link {
+        border: none;
+        color: #666;
+        border-radius: 10px;
+        padding: 12px 20px;
+        margin: 0 5px;
+        transition: all 0.3s ease;
+        font-weight: 500;
+      }
+      
+      .nav-tabs .nav-link:hover {
+        background: rgba(102,126,234,0.1);
+        color: #667eea;
+        transform: translateY(-2px);
+      }
+      
+      .nav-tabs .nav-link.active {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(102,126,234,0.3);
+      }
+      
+      /* Dropdown buttons */
+      .dropdown-btn-wrapper .btn {
+        background: linear-gradient(135deg, #FF6B9D 0%, #C44569 100%);
+        border: none;
+        color: white;
+        border-radius: 12px;
+        padding: 10px 20px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+      }
+      
+      .dropdown-btn-wrapper .btn:hover {
+        transform: translateY(-2px) scale(1.02);
+        box-shadow: 0 6px 20px rgba(255,107,157,0.3);
+      }
+      
+      /* Slider styling */
+      .irs--shiny {
+        height: 40px;
+      }
+      
+      .irs--shiny .irs-bar {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        height: 6px;
+        top: 25px;
+      }
+      
+      .irs--shiny .irs-handle {
+        width: 20px;
+        height: 20px;
+        border: 3px solid #667eea;
+        background: white;
+        box-shadow: 0 2px 8px rgba(102,126,234,0.3);
+        transition: all 0.2s ease;
+      }
+      
+      .irs--shiny .irs-handle:hover {
+        transform: scale(1.2);
+        box-shadow: 0 4px 12px rgba(102,126,234,0.5);
+      }
+      
+      /* Input styling */
+      .form-control, .selectize-input {
+        border: 2px solid rgba(102,126,234,0.2);
+        border-radius: 10px;
+        transition: all 0.3s ease;
+        background: rgba(255,255,255,0.9);
+      }
+      
+      .form-control:focus, .selectize-input.focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+        background: white;
+      }
+      
+      /* Radio buttons */
+      .pretty-radio-buttons {
+        display: flex;
+        gap: 10px;
+      }
+      
+      .pretty-radio-buttons .radio-inline {
+        background: white;
+        border: 2px solid rgba(102,126,234,0.2);
+        border-radius: 20px;
+        padding: 5px 15px;
+        transition: all 0.3s ease;
+        cursor: pointer;
+      }
+      
+      .pretty-radio-buttons .radio-inline:hover {
+        border-color: #667eea;
+        background: rgba(102,126,234,0.05);
+        transform: translateY(-2px);
+      }
+      
+      .pretty-radio-buttons input[type='radio']:checked + .radio-inline {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-color: transparent;
+      }
+      
+      /* Info icons */
+      .info-icon {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        background: linear-gradient(135deg, #A29BFE 0%, #6C5CE7 100%);
+        color: white;
+        border-radius: 50%;
+        text-align: center;
+        line-height: 20px;
+        font-size: 12px;
+        margin-left: 8px;
+        cursor: help;
+        transition: all 0.3s ease;
+      }
+      
+      .info-icon:hover {
+        transform: rotate(180deg) scale(1.2);
+        box-shadow: 0 4px 12px rgba(162,155,254,0.4);
+      }
+      
+      /* Warning messages */
+      .btn-warning {
+        background: linear-gradient(135deg, #FECA57 0%, #FF9FF3 100%);
+        border: none;
+        color: #333;
+        border-radius: 10px;
+        padding: 10px 20px;
+        font-weight: 600;
+        animation: pulse 2s infinite;
+      }
+      
+      @keyframes pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.02); }
+      }
+      
+      /* Plot containers */
+      .plot-container {
+        background: white;
+        border-radius: 15px;
+        padding: 20px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+        margin-bottom: 20px;
+      }
+      
+      /* Loading spinner */
+      .spinner-border {
+        width: 3rem;
+        height: 3rem;
+        border-width: 0.3em;
+        border-color: #667eea;
+        border-right-color: transparent;
+      }
+      
+      /* Feature toggle buttons */
+      .domain-toggle {
+        display: flex;
+        justify-content: flex-start;
+        align-items: center;
+        margin-bottom: 20px;
+        gap: 15px;
+      }
+      
+      .domain-toggle .btn-group {
+        display: flex;
+        gap: 0;
+        border-radius: 25px;
+        overflow: hidden;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      }
+      
+      .domain-toggle .btn {
+        background: white;
+        color: #666;
+        border: none;
+        padding: 8px 20px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        position: relative;
+      }
+      
+      .domain-toggle .btn:first-child {
+        border-radius: 25px 0 0 25px;
+      }
+      
+      .domain-toggle .btn:last-child {
+        border-radius: 0 25px 25px 0;
+      }
+      
+      .domain-toggle .btn:hover {
+        background: rgba(102,126,234,0.1);
+        color: #667eea;
+      }
+      
+      .domain-toggle .btn.active {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+      }
+      
+      /* Footer styling */
+      footer {
+        background: rgba(255,255,255,0.9);
+        border-radius: 15px;
+        padding: 20px;
+        margin: 20px;
+        text-align: center;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+      }
+      
+      footer a {
+        color: #667eea;
+        text-decoration: none;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        position: relative;
+      }
+      
+      footer a::after {
+        content: '';
+        position: absolute;
+        bottom: -2px;
+        left: 0;
+        width: 0;
+        height: 2px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        transition: width 0.3s ease;
+      }
+      
+      footer a:hover::after {
+        width: 100%;
+      }
+      
+      /* Smooth scroll behavior */
+      html {
+        scroll-behavior: smooth;
+      }
+      
+      /* Custom scrollbar */
+      ::-webkit-scrollbar {
+        width: 10px;
+      }
+      
+      ::-webkit-scrollbar-track {
+        background: rgba(102,126,234,0.1);
+        border-radius: 10px;
+      }
+      
+      ::-webkit-scrollbar-thumb {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 10px;
+      }
+      
+      ::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+      }
+    "))
   ),
+  
+  # Animated header
+  div(class = "app-header",
+      div(class = "molecule", style = "top: 10%; left: 5%;"),
+      div(class = "molecule", style = "top: 60%; left: 90%; animation-delay: -5s;"),
+      div(class = "molecule", style = "top: 80%; left: 15%; animation-delay: -10s;"),
+      div(class = "molecule", style = "top: 20%; right: 10%; animation-delay: -15s;"),
+      h1(class = "app-title",
+         tags$a(
+           "PeptAffinity",
+           href = paper_link,
+           target = "_blank",
+           style = "text-decoration: none; color: inherit;",
+           onclick = "Shiny.setInputValue('went_paper','header',{priority:'event'});"
+         )
+      ),
+      p("Explore MS-Olink correlations across protein sequences and structures", 
+        style = "color: #666; font-size: 1.1rem; margin-top: 10px;")
+  ),
+  
   fluidRow(
+    # Sidebar
     column(3,
            div(class = "sidebar-section",
                # Filters
@@ -1270,53 +1581,41 @@ z-index: 999999 !important;
                  status = "primary",
                  circle = FALSE,
                  inline = TRUE,
-                 
-                 # Correlation measure
+                 class = "btn-gradient",
                  
                  sliderInput(
-                   "corr_threshold", "Peptide correlation",
+                   "corr_threshold", "Correlation threshold",
                    min = -1, max = 1, value = c(-1, 1), step = 0.01
                  ),
                  
-                 tags$div(
-                   class = "inline-radio-group",
-                   prettyRadioButtons(
-                     inputId = "corr_measure",
-                     inline = TRUE,
-                     #label = "Correlation Measure:",
-                     label = NULL,
-                     choices = c("Mean" = "mean", "Median" = "median" , "Center" = "center"),
-                     selected = "mean",
-                     animation = "pulse"
-                   )
+                 prettyRadioButtons(
+                   inputId = "corr_measure",
+                   inline = TRUE,
+                   label = NULL,
+                   choices = c("Mean" = "mean", "Median" = "median", "Center" = "center"),
+                   selected = "mean",
+                   animation = "pulse"
                  ),
                  #Divide the section
                  hr(),
                  
                  # Spread measure
                  sliderInput(
-                   "spread_threshold", "Peptide correlation spread",
+                   "spread_threshold", "Correlation spread",
                    min = 0, max = 1, value = c(0, 1), step = 0.01
                  ),
                  
-                 
-                 
-                 tags$div(
-                   class = "inline-radio-group",
-                   prettyRadioButtons(
-                     inputId = "spread_measure",
-                     inline = TRUE,
-                     #label = "Spread Measure:",
-                     label = NULL,
-                     choices = c("SD" = "sd", "IQR" = "iqr", "Range" = "range"),
-                     selected = "sd",
-                     animation = "pulse"
-                   )
+                 prettyRadioButtons(
+                   inputId = "spread_measure",
+                   inline = TRUE,
+                   label = NULL,
+                   choices = c("SD" = "sd", "IQR" = "iqr", "Range" = "range"),
+                   selected = "sd",
+                   animation = "pulse"
                  ),
                  
                  #Divide the section
                  hr(),
-                 
                  
                  numericInput(
                    inputId = "n_peptides",
@@ -1343,86 +1642,92 @@ z-index: 999999 !important;
                  hr(),
                  
                  actionBttn(
-                   inputId = "clear_filters", 
-                   label = "Clear All", 
-                   icon = icon("times"), 
-                   style = "unite", 
+                   inputId = "clear_filters",
+                   label = "Clear All",
+                   icon = icon("times"),
+                   style = "gradient",
+                   color = "danger",
                    size = "sm"
                  )
                )
                
                
            ),
-           div(class = "sidebar-section",
+           
+           div(class = "sidebar-card",
                uiOutput("select_result_ui"),
                uiOutput("isoform_count_ui"),
                uiOutput("isoform_select_ui"),
-               div(class = "sidebar-section",
-                   dropdownButton(
-                     inputId = "peptide_filters_dropdown_btn",
-                     label   = "Peptide filters",
-                     icon    = icon("filter"),
-                     status  = "warning", 
-                     circle  = FALSE,
-                     inline  = TRUE,
-                     sliderInput(
-                       "n_samples_detected", "Samples with peptide",
-                       min = 16, max = 88, value = c(16, 88), step = 1
-                     )
-                   )
-               ),
+               
+               dropdownButton(
+                 inputId = "peptide_filters_dropdown_btn",
+                 label = "Peptide filters",
+                 icon = icon("filter"),
+                 status = "warning",
+                 circle = FALSE,
+                 inline = TRUE,
+                 class = "btn-gradient",
+                 
+                 sliderInput(
+                   "n_samples_detected", "Samples with peptide",
+                   min = 16, max = 88, value = c(16, 88), step = 1
+                 )
+               )
            )
     ),
+    
+    # Main content
     column(9,
            tabsetPanel(
              id = "main_tabs",
              
              tabPanel("Home",
-                      fluidRow(
-                        column(12,
-                               h3("Welcome to PeptAffinity"),
-                               p("Explore correlations between peptides quantified by MS and their corresponding Olink assays across protein sequences and structures using interactive visualizations."),
-                               p("• ‘Sequence’ – heatmap visualizing MS-Olink correlations for peptides mapped along the protein sequence, with associated protein domains and features"),
-                               p("• ‘Structure’ – AlphaFold model of the protein structure, colored by median MS-Olink correlation for detected peptides"),
-                               p("• ‘All proteins’ – global summary of the dataset"),
-                               p("Select a protein of interest in the left panel. Use the filters to narrow down the list of proteins based on correlation thresholds.")
-                        )
+                      div(class = "content-card",
+                          h3("Welcome to PeptAffinity"),
+                          p("Explore correlations between peptides quantified by MS and their corresponding Olink assays across protein sequences and structures using interactive visualizations.", 
+                            style = "font-size: 1.1rem; line-height: 1.6;"),
+                          
+                          div(style = "display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-top: 30px;",
+                              div(class = "content-card", style = "padding: 20px;",
+                                  icon("diagram-predecessor", style = "font-size: 2rem; color: #667eea; margin-bottom: 10px;"),
+                                  h5("Sequence"),
+                                  p("Heatmap visualizing MS-Olink correlations for peptides mapped along the protein sequence")
+                              ),
+                              div(class = "content-card", style = "padding: 20px;",
+                                  icon("cube", style = "font-size: 2rem; color: #764ba2; margin-bottom: 10px;"),
+                                  h5("Structure"),
+                                  p("AlphaFold model of the protein structure, colored by median MS-Olink correlation")
+                              ),
+                              div(class = "content-card", style = "padding: 20px;",
+                                  icon("arrow-up-right-dots", style = "font-size: 2rem; color: #FF6B9D; margin-bottom: 10px;"),
+                                  h5("All proteins"),
+                                  p("Global summary of the dataset with interactive visualizations")
+                              )
+                          )
                       )
              ),
              
-             
              tabPanel("Sequence",
-                      
-                      fluidRow(
-                        div(
-                          class = "domain-toggle",
-                          radioGroupButtons(
-                            inputId = "domain_source",
-                            label = "Feature Source:",
-                            choices = c("InterPro", "Prosite"),
-                            selected = "InterPro",
-                            justified = TRUE,
-                            size = "sm"
+                      div(class = "content-card",
+                          div(class = "domain-toggle",
+                              radioGroupButtons(
+                                inputId = "domain_source",
+                                label = "Feature Source:",
+                                choices = c("InterPro", "Prosite"),
+                                selected = "InterPro",
+                                justified = TRUE,
+                                size = "sm"
+                              ),
+                              icon("info-circle", class = "info-icon", id = "detailed_info",
+                                   title = "Shows the selected isoform with features and MS-Olink correlations",
+                                   `data-toggle` = "tooltip")
                           ),
-                          icon("info-circle", class = "info-icon", id = "detailed_info",
-                               title = "Here, we show the selected isoform with features from the InterPro or Prosite databases and the correlations of all mapped MS peptides to the corresponding Olink assay. Peptides covering the same position on the primary sequence are separated into multiple rows. The top shows kernel density of MS peptides in each category, the middle shows the domains, and the bottom shows the correlation values. The data shown in this plot can be adjusted using the dropdown filters for peptides.",
-                               `data-toggle` = "tooltip")
                           
+                          uiOutput("detailed_warn"),
                           
-                        )
-                      ),
-                      br(),
-                      fluidRow(
-                        column(12,
-                               div(style = "display: flex; justify-content: center;",
-                                   uiOutput("detailed_warn")
-                               )
-                        )
-                      ),
-                      fluidRow(
-                        column(12,
-                               withSpinner(plotlyOutput("detailed_plot", height = "800px"), type = 4) 
-                        )
+                          div(class = "plot-container",
+                              withSpinner(plotlyOutput("detailed_plot", height = "800px"), type = 4, color = "#667eea")
+                          )
                       )
              ),
             
@@ -1519,14 +1824,15 @@ z-index: 999999 !important;
     )
   ),
   tags$footer(
-    style = "text-align:center; font-size:0.8em; margin-top:20px;",
+    style = "margin-top: 50px;",
     tags$a(
-      href   = paper_link, # ← replaces automatically (see setup section)
-      id     = "paper_link_footer",
+      href = paper_link,
       target = "_blank",
-      onclick  = "Shiny.setInputValue('went_paper','footer',{priority:'event'});",
+      onclick = "Shiny.setInputValue('went_paper','footer',{priority:'event'});",
       "Read the PeptAffinity preprint"
-    )
+    ),
+    p("© 2025 built by Isabelle Leo, Noora Sissala, and Haris Babačić", 
+      style = "margin-top: 10px; color: #666; font-size: 0.9rem;")
   )
 )
 
@@ -1649,7 +1955,7 @@ server <- function(input, output, session) {
       return(tags$div("No results match the current filters.", class="text-danger"))
     }
     choices <- unique(fd$gene_symbol)
-    selectInput("selected_result", "Select Gene:", choices = choices, selected = choices[1])
+    selectInput("selected_result", "Select ID:", choices = choices, selected = choices[1])
   })
   
   observeEvent(input$selected_result, {
