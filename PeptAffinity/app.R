@@ -1220,15 +1220,15 @@ ui <- fluidPage(
       
       /* Sidebar styling */
       .sidebar-card {
-        background: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(250,250,255,0.9) 100%);
-        border-radius: 15px;
-        padding: 20px;
-        margin-bottom: 15px;
-        min-width: 20rem;
-        position: relative;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.05);
-        border: 1px solid rgba(102,126,234,0.2);
-      }
+  background: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(250,250,255,0.9) 100%);
+  border-radius: 15px;
+  padding: 20px;
+  margin-bottom: 15px;
+  /* min-width: 20rem; <- REMOVE THIS LINE */
+  position: relative;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+  border: 1px solid rgba(102,126,234,0.2);
+}
       
       .sidebar-card:hover {
         border-color: rgba(102,126,234,0.4);
@@ -1420,7 +1420,7 @@ ui <- fluidPage(
       }
       
       .btn-primary {
-        background: linear-gradient(135deg, #ff9cb9 0%, #d4a8ff 100%);
+        background: linear-gradient(135deg, #ff9cb9 0%, #ff709a 100%);
         border: none;
         color: #333;
         border-radius: 10px;
@@ -1554,6 +1554,56 @@ ui <- fluidPage(
       ::-webkit-scrollbar-thumb:hover {
         background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
       }
+      
+      /* Mobile preset layout */
+      @media (max-width: 768px) {
+  .container-fluid {
+    margin: 10px;
+    padding: 15px;
+  }
+  
+  .app-title {
+    font-size: 1.8rem;
+  }
+  
+  .sidebar-card {
+    margin-bottom: 10px;
+  }
+  
+  .dropdown-btn-wrapper {
+    width: 100%;
+  }
+  
+  .dropdown-btn-wrapper .btn {
+    width: 100%;
+    margin-bottom: 10px;
+  }
+  
+  /* Stack columns on mobile */
+  .col-md-4, .col-md-8 {
+    padding: 0 10px;
+  }
+  
+  /* Adjust tab panel for mobile */
+  .nav-tabs {
+    flex-wrap: wrap;
+  }
+  
+  .nav-tabs .nav-link {
+    font-size: 0.85rem;
+    padding: 8px 12px;
+  }
+}
+
+@media (max-width: 576px) {
+  .app-title {
+    font-size: 1.5rem;
+  }
+  
+  .content-card {
+    padding: 15px;
+  }
+}
     "))
   ),
   
@@ -1572,90 +1622,89 @@ ui <- fluidPage(
   
   fluidRow(
     # Sidebar
-    column(3,
-           div(class = "sidebar-section",
+    column(12, class = "col-lg-3 col-md-4",
                div(class = "sidebar-card",
+                   div(class = "sidebar-section",
+                       dropdownButton(
+                         inputId = "filters_dropdown_btn",
+                         label = "Protein Filters",
+                         icon = icon("sliders-h"),
+                         status = "primary",
+                         circle = FALSE,
+                         inline = TRUE,
+                         
+                         sliderInput(
+                           "corr_threshold", "Correlation threshold",
+                           min = -1, max = 1, value = c(-1, 1), step = 0.01
+                         ),
+                         
+                         prettyRadioButtons(
+                           inputId = "corr_measure",
+                           inline = TRUE,
+                           label = NULL,
+                           choices = c("Mean" = "mean", "Median" = "median", "Center" = "center"),
+                           selected = "mean",
+                           animation = "pulse"
+                         ),
+                         #Divide the section
+                         hr(),
+                         
+                         # Spread measure
+                         sliderInput(
+                           "spread_threshold", "Correlation spread",
+                           min = 0, max = 1, value = c(0, 1), step = 0.01
+                         ),
+                         
+                         prettyRadioButtons(
+                           inputId = "spread_measure",
+                           inline = TRUE,
+                           label = NULL,
+                           choices = c("SD" = "sd", "IQR" = "iqr", "Range" = "range"),
+                           selected = "sd",
+                           animation = "pulse"
+                         ),
+                         
+                         #Divide the section
+                         hr(),
+                         
+                         numericInput(
+                           inputId = "n_peptides",
+                           label = "Number of peptides ≥", 
+                           value = 1,
+                           max = 500, 
+                           min = 1, 
+                           step = 1
+                         ),
+                         
+                         #Divide the section
+                         hr(),
+                         
+                         numericInput(
+                           inputId = "n_isoforms",
+                           label = "Number of isoforms ≥", 
+                           value = 1, 
+                           max = 4, 
+                           min = 1, 
+                           step = 1
+                         ),
+                         
+                         #Divide the section
+                         hr(),
+                         
+                         actionBttn(
+                           inputId = "clear_filters",
+                           label = "Clear All",
+                           icon = icon("times"),
+                           style = "gradient",
+                           color = "warning",
+                           size = "sm"
+                         )
+                       ),
                    uiOutput("select_result_ui"), #Select gene symbol ID before filter, same section so it's clear
-                   uiOutput("ui_open_tab_button"),
-               # Filters
-               dropdownButton(
-                 inputId = "filters_dropdown_btn",
-                 label = "Protein Filters",
-                 icon = icon("sliders-h"),
-                 status = "primary",
-                 circle = FALSE,
-                 inline = TRUE,
-                 
-                 sliderInput(
-                   "corr_threshold", "Correlation threshold",
-                   min = -1, max = 1, value = c(-1, 1), step = 0.01
-                 ),
-                 
-                 prettyRadioButtons(
-                   inputId = "corr_measure",
-                   inline = TRUE,
-                   label = NULL,
-                   choices = c("Mean" = "mean", "Median" = "median", "Center" = "center"),
-                   selected = "mean",
-                   animation = "pulse"
-                 ),
-                 #Divide the section
-                 hr(),
-                 
-                 # Spread measure
-                 sliderInput(
-                   "spread_threshold", "Correlation spread",
-                   min = 0, max = 1, value = c(0, 1), step = 0.01
-                 ),
-                 
-                 prettyRadioButtons(
-                   inputId = "spread_measure",
-                   inline = TRUE,
-                   label = NULL,
-                   choices = c("SD" = "sd", "IQR" = "iqr", "Range" = "range"),
-                   selected = "sd",
-                   animation = "pulse"
-                 ),
-                 
-                 #Divide the section
-                 hr(),
-                 
-                 numericInput(
-                   inputId = "n_peptides",
-                   label = "Number of peptides ≥", 
-                   value = 1,
-                   max = 500, 
-                   min = 1, 
-                   step = 1
-                 ),
-                 
-                 #Divide the section
-                 hr(),
-                 
-                 numericInput(
-                   inputId = "n_isoforms",
-                   label = "Number of isoforms ≥", 
-                   value = 1, 
-                   max = 4, 
-                   min = 1, 
-                   step = 1
-                 ),
-                 
-                 #Divide the section
-                 hr(),
-                 
-                 actionBttn(
-                   inputId = "clear_filters",
-                   label = "Clear All",
-                   icon = icon("times"),
-                   style = "gradient",
-                   color = "warning",
-                   size = "sm"
-                 )
-               )
+                   uiOutput("ui_open_tab_button")
 
                )
-               
+                
            ),
            
 
@@ -1683,7 +1732,7 @@ dropdownButton(
     ),
     
     # Main content
-    column(9,
+column(12, class = "col-lg-9 col-md-8",
            tabsetPanel(
              id = "main_tabs",
              
@@ -1725,7 +1774,7 @@ dropdownButton(
                                 size = "sm"
                               ),
                               icon("info-circle", class = "info-icon", id = "detailed_info",
-                                   title = "Shows the selected isoform with features and MS-Olink correlations",
+                                   title = "Here, we show the selected isoform with features from the InterPro or Prosite databases and the correlations of all mapped MS peptides to the corresponding Olink assay. Peptides covering the same position on the primary sequence are separated into multiple rows. The top shows kernel density of MS peptides in each category, the middle shows the domains, and the bottom shows the correlation values. The data shown in this plot can be adjusted using the dropdown filters for peptides.",
                                    `data-toggle` = "tooltip")
                           ),
                           
