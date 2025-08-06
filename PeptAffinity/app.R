@@ -224,7 +224,7 @@ get_peptide_and_correlation_numeric <- function(fasta_list, peptide_seq_list, ex
       
     }
   }
-  
+
   return(peptide_indices)
 }
 
@@ -1176,28 +1176,27 @@ ui <- fluidPage(
       /* Typography */
       h1, h2, h3, h4 {
         font-family: 'Chakra Petch', sans-serif;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: #ff5c8d;
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
-        font-weight: 700;
+        font-weight: 550;
       }
       
       /* Animated header */
       .app-header {
         text-align: center;
-        padding: 30px 0;
+        padding: 10px 0;
         position: relative;
         overflow: hidden;
       }
       
       .app-title {
-        font-size: 3.5rem;
-        font-weight: 700;
-        margin: 0;
-        animation: float 3s ease-in-out infinite;
-        position: relative;
-        z-index: 1;
+        font-size: 2.5rem;
+        font-weight: 550;
+        margin-bottom: 10px;
+        z-index: 999;
+        color: #ff5c8d !important;
       }
       
       @keyframes float {
@@ -1205,15 +1204,6 @@ ui <- fluidPage(
         50% { transform: translateY(-10px); }
       }
       
-      /* Animated molecules background */
-      .molecule {
-        position: absolute;
-        width: 40px;
-        height: 40px;
-        background: radial-gradient(circle, rgba(102,126,234,0.4) 0%, transparent 70%);
-        border-radius: 50%;
-        animation: molecule-float 20s infinite ease-in-out;
-      }
       /* Card design for sections */
       .content-card {
         background: white;
@@ -1234,6 +1224,8 @@ ui <- fluidPage(
         border-radius: 15px;
         padding: 20px;
         margin-bottom: 15px;
+        min-width: 20rem;
+        position: relative;
         box-shadow: 0 4px 20px rgba(0,0,0,0.05);
         border: 1px solid rgba(102,126,234,0.2);
       }
@@ -1275,6 +1267,11 @@ ui <- fluidPage(
         transform: translateY(-2px);
         box-shadow: 0 8px 20px rgba(102,126,234,0.3);
       }
+      
+     .sidebar-section {
+      margin-bottom: 15px;
+
+    }
       
       /* Tab styling */
       .nav-tabs {
@@ -1411,7 +1408,7 @@ ui <- fluidPage(
         box-shadow: 0 4px 12px rgba(162,155,254,0.4);
       }
       
-      /* Warning messages */
+      /* Warning messages/peptide filter */
       .btn-warning {
         background: linear-gradient(135deg, #FECA57 0%, #FF9FF3 100%);
         border: none;
@@ -1419,7 +1416,17 @@ ui <- fluidPage(
         border-radius: 10px;
         padding: 10px 20px;
         font-weight: 600;
-        animation: pulse 2s infinite;
+        animation: pulse 2s;
+      }
+      
+      .btn-primary {
+        background: linear-gradient(135deg, #ff9cb9 0%, #d4a8ff 100%);
+        border: none;
+        color: #333;
+        border-radius: 10px;
+        padding: 10px 20px;
+        font-weight: 600;
+        animation: pulse 2s;
       }
       
       @keyframes pulse {
@@ -1552,27 +1559,24 @@ ui <- fluidPage(
   
   # Animated header
   div(class = "app-header",
-      div(class = "molecule", style = "top: 10%; left: 5%;"),
-      div(class = "molecule", style = "top: 60%; left: 90%; animation-delay: -5s;"),
-      div(class = "molecule", style = "top: 80%; left: 15%; animation-delay: -10s;"),
-      div(class = "molecule", style = "top: 20%; right: 10%; animation-delay: -15s;"),
       h1(class = "app-title",
          tags$a(
            "PeptAffinity",
            href = paper_link,
            target = "_blank",
-           style = "text-decoration: none; color: inherit;",
+           style = "text-decoration: none; color: #ff5c8d;",
            onclick = "Shiny.setInputValue('went_paper','header',{priority:'event'});"
          )
-      ),
-      p("Explore MS-Olink correlations across protein sequences and structures", 
-        style = "color: #666; font-size: 1.1rem; margin-top: 10px;")
+      )
   ),
   
   fluidRow(
     # Sidebar
     column(3,
            div(class = "sidebar-section",
+               div(class = "sidebar-card",
+                   uiOutput("select_result_ui"), #Select gene symbol ID before filter, same section so it's clear
+                   uiOutput("ui_open_tab_button"),
                # Filters
                dropdownButton(
                  inputId = "filters_dropdown_btn",
@@ -1581,7 +1585,6 @@ ui <- fluidPage(
                  status = "primary",
                  circle = FALSE,
                  inline = TRUE,
-                 class = "btn-gradient",
                  
                  sliderInput(
                    "corr_threshold", "Correlation threshold",
@@ -1646,19 +1649,19 @@ ui <- fluidPage(
                    label = "Clear All",
                    icon = icon("times"),
                    style = "gradient",
-                   color = "danger",
+                   color = "warning",
                    size = "sm"
                  )
                )
-               
+
+               )
                
            ),
            
+
            div(class = "sidebar-card",
-               uiOutput("select_result_ui"),
-               uiOutput("isoform_count_ui"),
                uiOutput("isoform_select_ui"),
-               uiOutput("ui_open_tab_button"),
+               uiOutput("isoform_count_ui"),
                uiOutput("ui_open_tab_button2"),
                p("\n"),
                div(class = "sidebar-section",
@@ -1669,7 +1672,6 @@ dropdownButton(
   status = "warning",
   circle = FALSE,
   inline = TRUE,
-  class = "btn-gradient",
   
   sliderInput(
     "n_samples_detected", "Samples with peptide",
@@ -1736,7 +1738,8 @@ dropdownButton(
              ),
             
              tabPanel("Structure",
-                      fluidRow(
+                      div(class = "content-card",
+                        fluidRow(
                         column(12,
 
                                span("Alphafold Structural Data", class = "plot-title"),
@@ -1799,11 +1802,13 @@ dropdownButton(
                                )
                         )
                       )
+                      )
              ),
              
              
              # Summary second/third
              tabPanel("All proteins",
+                      div(class = "content-card",
                       fluidRow(
                         column(12,
                                span("Summary of Filtered Results", class = "plot-title"),
@@ -1825,6 +1830,7 @@ dropdownButton(
                       )
              )
            )
+    )
     )
   ),
   tags$footer(
@@ -1987,24 +1993,12 @@ server <- function(input, output, session) {
   output$ui_open_tab_button <- renderUI({
     shiny::a(
       h4(icon("th"),
-         paste0("Read more about: ", input$selected_result, " (GeneCards)"),
+         paste0("Read about: ", input$selected_result, " (GeneCards)"),
          class = "btn btn-default action-button",
          style = "fontweight:600"),
       target = "_blank",
       href = paste0("https://www.genecards.org/cgi-bin/carddisp.pl?gene=",
                     input$selected_result, "&keywords=", input$selected_result)
-    )
-  })
-  
-  output$ui_open_tab_button2 <- renderUI({
-    shiny::a(
-      h4(icon("th"),
-         paste0("Read more about: ", input$selected_result, " (UniProt)"),
-         class = "btn btn-default action-button",
-         style = "fontweight:600"),
-      target = "_blank",
-      href = paste0("https://www.uniprot.org/uniprotkb?query=",
-                    input$selected_result)
     )
   })
   
@@ -2015,7 +2009,19 @@ server <- function(input, output, session) {
     
     isoforms <- unique(unlist(strsplit(sub_dt$UniProt.MS, ";")))
     # Safely select first isoform if available
-    default_selected <- if (length(isoforms) > 0) isoforms[1] else NULL
+    if (length(isoforms) > 0) {default_selected <- isoforms[1] 
+      output$ui_open_tab_button2 <- renderUI({
+        shiny::a(
+          h4(icon("th"),
+             paste0("Read about: ", input$selected_isoforms, " (UniProt)"),
+             class = "btn btn-default action-button",
+             style = "fontweight:600"),
+          target = "_blank",
+          href = paste0("https://www.uniprot.org/uniprotkb?query=",
+                        input$selected_isoforms)
+        )
+      })
+      }else default_selected <- NULL
     
     selectInput("selected_isoforms", 
                 "Select Isoform(s):", 
