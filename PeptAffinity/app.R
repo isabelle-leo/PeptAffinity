@@ -1061,6 +1061,29 @@ clean_peptide_sequence <- function(peptide_seq) {
   gsub("\\+[0-9]+\\.[0-9]+", "", peptide_seq)
 }
 
+count_ptms <- function(peptide_seq) {
+  # Count occurrences of PTM pattern (+XX.XX)
+  all_mods <- regmatches(peptide_seq, gregexpr("\\+[0-9]+\\.[0-9]+", peptide_seq))
+  
+  # TMT masses to exclude (allowing for rounding variations)
+  # TMT/TMTpro: ~229.16, ~304.21
+  tmt_masses <- c(229.16, 229.163, 304.21, 304.207)
+  
+  # Count non-TMT modifications
+  sapply(all_mods, function(mods) {
+    if (length(mods) == 0) return(0)
+    
+    # Extract numeric values from modifications
+    mod_values <- as.numeric(gsub("\\+", "", mods))
+    
+    # Count modifications that aren't TMT (within 0.01 Da tolerance)
+    sum(!sapply(mod_values, function(x) {
+      any(abs(x - tmt_masses) < 0.01)
+    }))
+  })
+}
+
+
 #Google analytics server function
 ga_send <- function(client_id, name, params = list(), time = FALSE) {
   measurement_id <- Sys.getenv("GA_MEASUREMENT_ID")
@@ -1743,9 +1766,22 @@ ui <- fluidPage(
                          div(class = "spinner-border text-primary", role = "status")
                        ),
                        
+                       
+                       
                        sliderInput(
                          "n_samples_detected", "Samples with peptide",
                          min = 16, max = 88, value = c(16, 88), step = 1
+                       ),
+                       
+                       sliderInput(
+                         "n_ptms", "Number of PTMs",
+                         min = 0, max = 10, value = c(0, 10), step = 1
+                       ),
+                       
+                       div(
+                         style = "background-color: #fff3cd; border: 1px solid #ffc107; padding: 8px; margin-bottom: 10px; border-radius: 5px; font-size: 0.85rem;",
+                         icon("info-circle", style = "color: #856404;"),
+                         "These filters only affect Structure and Sequence plots."
                        )
                      ),
 
@@ -1943,7 +1979,7 @@ server <- function(input, output, session) {
     c("corr_threshold", "corr_measure",
       "spread_threshold", "spread_measure",
       "n_peptides",      "n_isoforms",
-      "n_samples_detected"),
+      "n_samples_detected", "n_ptms"),
     ~ track_input(.x, input, cid, send_value = FALSE))
   
   ## 3. help‑icon clicks ---------------------------------------------------
@@ -2027,6 +2063,7 @@ server <- function(input, output, session) {
     updateNumericInput(session, "n_peptides", value = 1)
     updateNumericInput(session, "n_isoforms", value = 1)
     updateSliderInput(session, "n_samples_detected", value = c(0, 100))
+    updateSliderInput(session, "n_ptms", value = c(0, 10))
     
   })
   
@@ -2104,8 +2141,8 @@ server <- function(input, output, session) {
   
   working_plasma_dt <- reactive({
     req(input$selected_result)  # Must have a gene
-    dt <- plasma_dt[Gene.Name == input$selected_result]
-    
+    dt <- plasma_dt[Gene.Name == input$selected_result] # subset
+    dt[, PTM_count := count_ptms(Peptide.sequence)] # count PTMs
     # If isoforms are chosen, subset further
     if (!is.null(input$selected_isoforms) && length(input$selected_isoforms) > 0) {
       
@@ -2121,9 +2158,16 @@ server <- function(input, output, session) {
       dt <- dt[UniProt.MS %in% input$selected_isoforms]
     }
     
+    # Sample filter
     if ("N" %in% names(dt) && !is.null(input$n_samples_detected)) {
       dt <- dt[N >= input$n_samples_detected[1] &
                  N <= input$n_samples_detected[2]]
+    }
+    
+    # PTM filter
+    if (!is.null(input$n_ptms)) {
+      dt <- dt[PTM_count >= input$n_ptms[1] & 
+                 PTM_count <= input$n_ptms[2]]
     }
     
     # Return a data.table
