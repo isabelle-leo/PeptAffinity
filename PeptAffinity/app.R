@@ -1716,19 +1716,40 @@ ui <- fluidPage(
                uiOutput("ui_open_tab_button2"),
                p("\n"),
                div(class = "sidebar-section",
-dropdownButton(
-  inputId = "peptide_filters_dropdown_btn",
-  label = "Peptide filters",
-  icon = icon("filter"),
-  status = "warning",
-  circle = FALSE,
-  inline = TRUE,
-  
-  sliderInput(
-    "n_samples_detected", "Samples with peptide",
-    min = 16, max = 88, value = c(16, 88), step = 1
-  )
-)
+                   div(
+                     style = "position: relative;",
+                     dropdownButton(
+                       inputId = "peptide_filters_dropdown_btn",
+                       label = "Peptide filters",
+                       icon = icon("filter"),
+                       status = "warning",
+                       circle = FALSE,
+                       inline = TRUE,
+                       width = "100%",
+                       
+                       sliderInput(
+                         "n_samples_detected", "Samples with peptide",
+                         min = 16, max = 88, value = c(16, 88), step = 1
+                       )
+                     ),
+                     # Add loading overlay for the button
+                     div(
+                       id = "peptide-filter-loading",
+                       style = "
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(255,255,255,0.8);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      border-radius: 12px;
+    ",
+                       div(class = "spinner-border text-primary", role = "status",
+                           span(class = "sr-only", "Loading..."))
+                     )
+                   )
                ),
            )
     ),
@@ -2270,8 +2291,10 @@ return;
 
 
 // Call to the overlay spinner
-  var spinner   = el.parentNode.querySelector('#ngl-loading');
+  var spinner = el.parentNode.querySelector('#ngl-loading');
+  var peptideSpinner = document.querySelector('#peptide-filter-loading');
   if (spinner) spinner.style.display = 'flex';
+  if (peptideSpinner) peptideSpinner.style.display = 'flex';
 
 
   // The part that looks for surfaces to be rendered
@@ -2280,12 +2303,14 @@ return;
     var iv = setInterval(function() {
     if (stage.tasks.count === 0) {
       spinner.style.display = 'none';
+      if (peptideSpinner) peptideSpinner.style.display = 'none';
       clearInterval(iv);
     }
   }, 100);
   } else {
     // fallback: if stage isn't even available, just hide
     if (spinner) spinner.style.display = 'none';
+    if (peptideSpinner) peptideSpinner.style.display = 'none';
   }
   
     // Turn off the built-in tooltip
