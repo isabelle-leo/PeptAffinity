@@ -1727,28 +1727,28 @@ ui <- fluidPage(
                        inline = TRUE,
                        width = "100%",
                        
+                       #Loading overlay
+                       div(
+                         id = "peptide-dropdown-overlay",
+                         style = "
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(255,255,255,0.9);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+      border-radius: 8px;
+    ",
+                         div(class = "spinner-border text-primary", role = "status")
+                       ),
+                       
                        sliderInput(
                          "n_samples_detected", "Samples with peptide",
                          min = 16, max = 88, value = c(16, 88), step = 1
                        )
                      ),
-                     # Add loading overlay for the button
-                     div(
-                       id = "peptide-filter-loading",
-                       style = "
-      position: absolute;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      background: rgba(255,255,255,0.8);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-      border-radius: 12px;
-    ",
-                       div(class = "spinner-border text-primary", role = "status",
-                           span(class = "sr-only", "Loading..."))
-                     )
+
                    )
                ),
            )
@@ -2245,6 +2245,22 @@ server <- function(input, output, session) {
     
   })
   
+  observeEvent(input$ngl_loading, {
+    if (isTRUE(input$ngl_loading)) {
+      shinyjs::disable("n_samples_detected")
+      shinyjs::runjs("
+      $('#peptide_filters_dropdown_btn').addClass('disabled');
+      $('.sw-dropdown-content').css('pointer-events', 'none');
+    ")
+    } else {
+      shinyjs::enable("n_samples_detected")
+      shinyjs::runjs("
+      $('#peptide_filters_dropdown_btn').removeClass('disabled');
+      $('.sw-dropdown-content').css('pointer-events', 'auto');
+    ")
+    }
+  })
+  
   # Render the NGL plot output
   # user_agent <- isolate(session$request$HTTP_USER_AGENT)
   # if (grepl("DuckDuckGo", user_agent, ignore.case=TRUE)) {
@@ -2291,27 +2307,44 @@ return;
 
 
 // Call to the overlay spinner
-  var spinner = el.parentNode.querySelector('#ngl-loading');
-  var peptideSpinner = document.querySelector('#peptide-filter-loading');
-  if (spinner) spinner.style.display = 'flex';
-  if (peptideSpinner) peptideSpinner.style.display = 'flex';
+var spinner = el.parentNode.querySelector('#ngl-loading');
+var peptideOverlay = document.getElementById('peptide-dropdown-overlay');
+var peptideBtn = document.querySelector('[data-id=\"peptide_filters_dropdown_btn\"]');
 
+if (spinner) spinner.style.display = 'flex';
+if (peptideOverlay) peptideOverlay.style.display = 'flex';
+if (peptideBtn) {
+  peptideBtn.style.opacity = '0.5';
+  peptideBtn.style.pointerEvents = 'none';
+}
+
+// Disable the slider using Shiny
+Shiny.setInputValue('ngl_loading', true, {priority: 'event'});
 
   // The part that looks for surfaces to be rendered
   var stage = this.getStage();
-  if(stage) {
-    var iv = setInterval(function() {
+if(stage) {
+  var iv = setInterval(function() {
     if (stage.tasks.count === 0) {
-      spinner.style.display = 'none';
-      if (peptideSpinner) peptideSpinner.style.display = 'none';
+      if (spinner) spinner.style.display = 'none';
+      if (peptideOverlay) peptideOverlay.style.display = 'none';
+      if (peptideBtn) {
+        peptideBtn.style.opacity = '1';
+        peptideBtn.style.pointerEvents = 'auto';
+      }
+      Shiny.setInputValue('ngl_loading', false, {priority: 'event'});
       clearInterval(iv);
     }
   }, 100);
-  } else {
-    // fallback: if stage isn't even available, just hide
-    if (spinner) spinner.style.display = 'none';
-    if (peptideSpinner) peptideSpinner.style.display = 'none';
+} else {
+  if (spinner) spinner.style.display = 'none';
+  if (peptideOverlay) peptideOverlay.style.display = 'none';
+  if (peptideBtn) {
+    peptideBtn.style.opacity = '1';
+    peptideBtn.style.pointerEvents = 'auto';
   }
+  Shiny.setInputValue('ngl_loading', false, {priority: 'event'});
+}
   
     // Turn off the built-in tooltip
     stage.setParameters({tooltip: false});
