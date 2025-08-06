@@ -1171,6 +1171,8 @@ ui <- fluidPage(
         margin: 20px;
         padding: 30px;
         box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+        overflow-x: hidden;
+        max-width: 100%;
       }
       
       /* Typography */
@@ -1632,7 +1634,7 @@ ui <- fluidPage(
                          status = "primary",
                          circle = FALSE,
                          inline = TRUE,
-                         
+
                          sliderInput(
                            "corr_threshold", "Correlation threshold",
                            min = -1, max = 1, value = c(-1, 1), step = 0.01
