@@ -122,7 +122,7 @@ my_theme <- bs_theme(
   primary = "#FF876F",
   fg = '#4F0433', 
   bg = "#fff",
-  "font-size-base" = "0.9rem"
+  "font-size-base" = "0.9rem",
   heading_font = font_google("Chakra Petch"),
   `enable-rounded` = TRUE,
   bootswatch = "flatly"
@@ -1658,8 +1658,6 @@ ui <- fluidPage(
                uiOutput("select_result_ui"),
                uiOutput("isoform_count_ui"),
                uiOutput("isoform_select_ui"),
-
-=======
                uiOutput("ui_open_tab_button"),
                uiOutput("ui_open_tab_button2"),
                p("\n"),
@@ -1679,7 +1677,6 @@ dropdownButton(
   )
 )
                ),
->>>>>>> 36edf0f9baf06763ad43c8594bc603d2fa88d1a9
            )
     ),
     
