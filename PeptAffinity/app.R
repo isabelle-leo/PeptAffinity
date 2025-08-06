@@ -1658,21 +1658,28 @@ ui <- fluidPage(
                uiOutput("select_result_ui"),
                uiOutput("isoform_count_ui"),
                uiOutput("isoform_select_ui"),
-               
-               dropdownButton(
-                 inputId = "peptide_filters_dropdown_btn",
-                 label = "Peptide filters",
-                 icon = icon("filter"),
-                 status = "warning",
-                 circle = FALSE,
-                 inline = TRUE,
-                 class = "btn-gradient",
-                 
-                 sliderInput(
-                   "n_samples_detected", "Samples with peptide",
-                   min = 16, max = 88, value = c(16, 88), step = 1
-                 )
-               )
+
+=======
+               uiOutput("ui_open_tab_button"),
+               uiOutput("ui_open_tab_button2"),
+               p("\n"),
+               div(class = "sidebar-section",
+dropdownButton(
+  inputId = "peptide_filters_dropdown_btn",
+  label = "Peptide filters",
+  icon = icon("filter"),
+  status = "warning",
+  circle = FALSE,
+  inline = TRUE,
+  class = "btn-gradient",
+  
+  sliderInput(
+    "n_samples_detected", "Samples with peptide",
+    min = 16, max = 88, value = c(16, 88), step = 1
+  )
+)
+               ),
+>>>>>>> 36edf0f9baf06763ad43c8594bc603d2fa88d1a9
            )
     ),
     
@@ -1977,6 +1984,30 @@ server <- function(input, output, session) {
     div(
       style = "background-color: #f9f9f9; border: 1px solid #ccc; padding: 5px; margin-bottom: 10px;",
       paste0("For ", input$selected_result, ", there are ", num_iso, " isoforms detected.")
+    )
+  })
+  
+  output$ui_open_tab_button <- renderUI({
+    shiny::a(
+      h4(icon("th"),
+         paste0("Read more about: ", input$selected_result, " (GeneCards)"),
+         class = "btn btn-default action-button",
+         style = "fontweight:600"),
+      target = "_blank",
+      href = paste0("https://www.genecards.org/cgi-bin/carddisp.pl?gene=",
+                    input$selected_result, "&keywords=", input$selected_result)
+    )
+  })
+  
+  output$ui_open_tab_button2 <- renderUI({
+    shiny::a(
+      h4(icon("th"),
+         paste0("Read more about: ", input$selected_result, " (UniProt)"),
+         class = "btn btn-default action-button",
+         style = "fontweight:600"),
+      target = "_blank",
+      href = paste0("https://www.uniprot.org/uniprotkb?query=",
+                    input$selected_result)
     )
   })
   
