@@ -1357,6 +1357,9 @@ z-index: 999999 !important;
                uiOutput("select_result_ui"),
                uiOutput("isoform_count_ui"),
                uiOutput("isoform_select_ui"),
+               uiOutput("ui_open_tab_button"),
+               uiOutput("ui_open_tab_button2"),
+               p("\n"),
                div(class = "sidebar-section",
                    dropdownButton(
                      inputId = "peptide_filters_dropdown_btn",
@@ -1671,6 +1674,30 @@ server <- function(input, output, session) {
     div(
       style = "background-color: #f9f9f9; border: 1px solid #ccc; padding: 5px; margin-bottom: 10px;",
       paste0("For ", input$selected_result, ", there are ", num_iso, " isoforms detected.")
+    )
+  })
+  
+  output$ui_open_tab_button <- renderUI({
+    shiny::a(
+      h4(icon("th"),
+         paste0("Read more about: ", input$selected_result, " (GeneCards)"),
+         class = "btn btn-default action-button",
+         style = "fontweight:600"),
+      target = "_blank",
+      href = paste0("https://www.genecards.org/cgi-bin/carddisp.pl?gene=",
+                    input$selected_result, "&keywords=", input$selected_result)
+    )
+  })
+  
+  output$ui_open_tab_button2 <- renderUI({
+    shiny::a(
+      h4(icon("th"),
+         paste0("Read more about: ", input$selected_result, " (UniProt)"),
+         class = "btn btn-default action-button",
+         style = "fontweight:600"),
+      target = "_blank",
+      href = paste0("https://www.uniprot.org/uniprotkb?query=",
+                    input$selected_result)
     )
   })
   
