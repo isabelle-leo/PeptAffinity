@@ -1849,6 +1849,13 @@ column(12, class = "col-lg-9 col-md-8",
                       div(class = "content-card",
                         fluidRow(
                         column(12,
+                               tags$div(
+                                 id = "mobile-structure-warning",
+                                 class = "btn-warning d-block d-md-none", # Bootstrap classes: show on small, hide on medium+
+                                 style = "margin-bottom: 15px;",
+                                 icon("expand"),
+                                 "3D visualization works best on larger screens."
+                               ),
 
                                span("Alphafold Structural Data", class = "plot-title"),
                                icon("info-circle", class = "info-icon", id = "alphafold_info",
@@ -2012,7 +2019,6 @@ server <- function(input, output, session) {
       n_isoforms = length(unique(unlist(strsplit(paste(UniProt.MS, collapse = ";"), ";"))))
     )
   
-  
   filtered_data <- reactive({
     
     # Ensure the correct inputs are available
@@ -2064,6 +2070,7 @@ server <- function(input, output, session) {
     updateNumericInput(session, "n_isoforms", value = 1)
     updateSliderInput(session, "n_samples_detected", value = c(0, 100))
     updateSliderInput(session, "n_ptms", value = c(0, 10))
+
     
   })
   
@@ -2173,6 +2180,7 @@ server <- function(input, output, session) {
     # Return a data.table
     dt
   })
+  
   
   filtered_peptide_list <- reactive({
     req(input$selected_result)
@@ -2289,22 +2297,6 @@ server <- function(input, output, session) {
     
   })
   
-  observeEvent(input$ngl_loading, {
-    if (isTRUE(input$ngl_loading)) {
-      shinyjs::disable("n_samples_detected")
-      shinyjs::runjs("
-      $('#peptide_filters_dropdown_btn').addClass('disabled');
-      $('.sw-dropdown-content').css('pointer-events', 'none');
-    ")
-    } else {
-      shinyjs::enable("n_samples_detected")
-      shinyjs::runjs("
-      $('#peptide_filters_dropdown_btn').removeClass('disabled');
-      $('.sw-dropdown-content').css('pointer-events', 'auto');
-    ")
-    }
-  })
-  
   # Render the NGL plot output
   # user_agent <- isolate(session$request$HTTP_USER_AGENT)
   # if (grepl("DuckDuckGo", user_agent, ignore.case=TRUE)) {
@@ -2314,6 +2306,22 @@ server <- function(input, output, session) {
   # } else {
   output$NGL_plot <- renderNGLVieweR({
     need(ngl_plot_obj(), message = paste("No valid AlphaFold structure file returned for this ID of interest."))
+    
+    observeEvent(input$ngl_loading, {
+      if (isTRUE(input$ngl_loading)) {
+        shinyjs::disable("n_samples_detected")
+        shinyjs::runjs("
+      $('#peptide_filters_dropdown_btn').addClass('disabled');
+      $('.sw-dropdown-content').css('pointer-events', 'none');
+    ")
+      } else {
+        shinyjs::enable("n_samples_detected")
+        shinyjs::runjs("
+      $('#peptide_filters_dropdown_btn').removeClass('disabled');
+      $('.sw-dropdown-content').css('pointer-events', 'auto');
+    ")
+      }
+    })
     
     htmlwidgets::onRender(
       x = ngl_plot_obj(),
@@ -2348,7 +2356,28 @@ return;
       console.log('     ↳ repr[' + ri + ']:', rep, 'prototype:', Object.getPrototypeOf(rep));
     });
   });
-
+  
+// Mobile related: check screen size
+$(document).ready(function() {
+  function checkScreenSize() {
+    var isSmallScreen = window.innerWidth < 768; // Bootstrap's md breakpoint
+    Shiny.setInputValue('is_small_screen', isSmallScreen);
+    
+    if (isSmallScreen) {
+      $('#mobile-structure-warning').show();
+    } else {
+      $('#mobile-structure-warning').hide();
+    }
+  }
+  
+  // Check on load
+  checkScreenSize();
+  
+  // Check on resize
+  $(window).resize(function() {
+    checkScreenSize();
+  });
+});
 
 // Call to the overlay spinner
 var spinner = el.parentNode.querySelector('#ngl-loading');
@@ -2464,21 +2493,21 @@ tip.style.top  =  (y + 8) + 'px';
   
   
   output$alphafold_warn <- renderUI({
-    if (nrow(working_plasma_dt()) == 0) {
-      return(tags$div("No peptide data matches filter conditions. Please adjust your filter settings.", 
-                      class = "btn-warning"))
-    }
+    # Use validate to handle all the edge cases cleanly
     validate(
-      need(ngl_plot_obj(), "No valid AlphaFold structure file returned for this ID of interest.")
+      need(input$selected_result, ""),  # Silent if no selection
+      need(working_plasma_dt(), ""),    # Silent if NULL
+      need(nrow(working_plasma_dt()) > 0, message = "No data matches filter conditions. Please adjust your filter settings.")
     )
-    NULL  })
+    NULL  # If all validations pass, show nothing
+  })
   
   output$detailed_warn <- renderUI({
-    # Check if we have data after filtering
-    if (nrow(working_plasma_dt()) == 0) {
-      return(tags$div("No peptide data matches filter conditions. Please adjust your filter settings.", 
-                      class = "btn-warning"))
-    }
+    validate(
+      need(input$selected_result, ""),
+      need(working_plasma_dt(), ""),
+      need(nrow(working_plasma_dt()) > 0, message = "No data matches filter conditions. Please adjust your filter settings.")
+    )
     NULL
   })
   
