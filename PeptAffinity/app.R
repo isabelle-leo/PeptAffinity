@@ -1083,6 +1083,24 @@ count_ptms <- function(peptide_seq) {
   })
 }
 
+count_phospho <- function(peptide_seq) {
+  # Extract all modifications
+  all_mods <- regmatches(peptide_seq, gregexpr("\\+[0-9]+\\.[0-9]+", peptide_seq))
+  
+  # Phosphorylation mass: ~79.966
+  phospho_mass <- 79.966
+  
+  # Count phosphorylations
+  sapply(all_mods, function(mods) {
+    if (length(mods) == 0) return(0)
+    
+    # Extract numeric values
+    mod_values <- as.numeric(gsub("\\+", "", mods))
+    
+    # Count mods that are phosphorylation (within 0.01 Da tolerance)
+    sum(abs(mod_values - phospho_mass) < 0.01)
+  })
+}
 
 #Google analytics server function
 ga_send <- function(client_id, name, params = list(), time = FALSE) {
@@ -1182,7 +1200,7 @@ ui <- fluidPage(
     tags$style(HTML("
       /* Main gradient background */
       body {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
         min-height: 100vh;
       }
       
@@ -1208,7 +1226,7 @@ ui <- fluidPage(
         font-weight: 550;
       }
       
-      /* Animated header */
+      /* Header */
       .app-header {
         text-align: center;
         padding: 10px 0;
@@ -1764,7 +1782,7 @@ ui <- fluidPage(
                        status = "warning",
                        circle = FALSE,
                        inline = TRUE,
-                       width = "100%",
+                       width = "150%",
                        
                        #Loading overlay
                        div(
@@ -1794,6 +1812,19 @@ ui <- fluidPage(
                          min = 0, max = 10, value = c(0, 10), step = 1
                        ),
                        
+                       sliderInput(
+                         "n_phospho", "Phosphorylations",
+                         min = 0, max = 5, value = c(0, 5), step = 1
+                       ),
+                       
+                       # Add a toggle for phospho-only mode
+                       prettySwitch(
+                         inputId = "phospho_only",
+                         label = "Phospho-peptides only",
+                         value = FALSE,
+                         status = "success",
+                         slim = TRUE
+                       ),
                        div(
                          style = "background-color: #fff3cd; border: 1px solid #ffc107; padding: 8px; margin-bottom: 10px; border-radius: 5px; font-size: 0.85rem;",
                          icon("info-circle", style = "color: #856404;"),
@@ -2086,6 +2117,7 @@ server <- function(input, output, session) {
     updateNumericInput(session, "n_isoforms", value = 1)
     updateSliderInput(session, "n_samples_detected", value = c(0, 100))
     updateSliderInput(session, "n_ptms", value = c(0, 10))
+    updatePrettySwitch(session, "phospho_only", value = FALSE)
 
     
   })
@@ -2166,6 +2198,7 @@ server <- function(input, output, session) {
     req(input$selected_result)  # Must have a gene
     dt <- plasma_dt[Gene.Name == input$selected_result] # subset
     dt[, PTM_count := count_ptms(Peptide.sequence)] # count PTMs
+    dt[, Phospho_count := count_phospho(Peptide.sequence)] #count phospho PTMs
     # If isoforms are chosen, subset further
     if (!is.null(input$selected_isoforms) && length(input$selected_isoforms) > 0) {
       
@@ -2191,6 +2224,15 @@ server <- function(input, output, session) {
     if (!is.null(input$n_ptms)) {
       dt <- dt[PTM_count >= input$n_ptms[1] & 
                  PTM_count <= input$n_ptms[2]]
+    }
+    # + phospho too!
+    if (!is.null(input$n_phospho)) {
+      dt <- dt[Phospho_count >= input$n_phospho[1] & 
+                 Phospho_count <= input$n_phospho[2]]
+    }
+    # Phospho-only mode
+    if (!is.null(input$phospho_only) && input$phospho_only) {
+      dt <- dt[Phospho_count > 0]
     }
     
     # Return a data.table
