@@ -1809,7 +1809,7 @@ ui <- fluidPage(
                        
                        sliderInput(
                          "n_ptms", "Number of PTMs",
-                         min = 0, max = 10, value = c(0, 10), step = 1
+                         min = 0, max = 5, value = c(0, 5), step = 1
                        ),
                        
                        sliderInput(
