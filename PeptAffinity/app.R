@@ -120,7 +120,7 @@ my_theme <- bs_theme(
   version = 5,
   base_font = font_google("Open Sans"),
   primary = "#FF876F",
-  fg = '#4F0433', 
+  fg = '#6964bd', 
   bg = "#fff",
   "font-size-base" = "0.9rem",
   heading_font = font_google("Chakra Petch"),
@@ -1463,7 +1463,7 @@ ui <- fluidPage(
       }
       
       .btn-primary {
-        background: linear-gradient(135deg, #ff9cb9 0%, #ff709a 100%);
+        background: linear-gradient(135deg, #a9a6e3 0%, #a6e3ba 100%);
         border: none;
         color: #333;
         border-radius: 10px;
@@ -2117,6 +2117,7 @@ server <- function(input, output, session) {
     updateNumericInput(session, "n_isoforms", value = 1)
     updateSliderInput(session, "n_samples_detected", value = c(0, 100))
     updateSliderInput(session, "n_ptms", value = c(0, 10))
+    updateSliderInput(session, "n_phospho", value = c(0, 5))
     updatePrettySwitch(session, "phospho_only", value = FALSE)
 
     
