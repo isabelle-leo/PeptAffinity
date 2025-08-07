@@ -1657,6 +1657,22 @@ ui <- fluidPage(
                          status = "primary",
                          circle = FALSE,
                          inline = TRUE,
+                         
+                         #Loading overlay
+                         div(
+                           id = "protein-dropdown-overlay",
+                           style = "
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(255,255,255,0.9);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+      border-radius: 8px;
+    ",
+                           div(class = "spinner-border text-primary", role = "status")
+                         ),
 
                          sliderInput(
                            "corr_threshold", "Correlation threshold",
@@ -2383,12 +2399,20 @@ $(document).ready(function() {
 var spinner = el.parentNode.querySelector('#ngl-loading');
 var peptideOverlay = document.getElementById('peptide-dropdown-overlay');
 var peptideBtn = document.querySelector('[data-id=\"peptide_filters_dropdown_btn\"]');
+var proteinOverlay = document.getElementById('protein-dropdown-overlay');
+var proteinBtn = document.querySelector('[data-id=\"filters_dropdown_btn\"]');
 
 if (spinner) spinner.style.display = 'flex';
 if (peptideOverlay) peptideOverlay.style.display = 'flex';
 if (peptideBtn) {
   peptideBtn.style.opacity = '0.5';
   peptideBtn.style.pointerEvents = 'none';
+}
+
+if (proteinOverlay) proteinOverlay.style.display = 'flex';
+if (proteinBtn) {
+  proteinBtn.style.opacity = '0.5';
+  proteinBtn.style.pointerEvents = 'none';
 }
 
 // Disable the slider using Shiny
@@ -2405,6 +2429,11 @@ if(stage) {
         peptideBtn.style.opacity = '1';
         peptideBtn.style.pointerEvents = 'auto';
       }
+      if (proteinOverlay) proteinOverlay.style.display = 'none';
+if (proteinBtn) {
+  proteinBtn.style.opacity = '1';
+  proteinBtn.style.pointerEvents = 'auto';
+}
       Shiny.setInputValue('ngl_loading', false, {priority: 'event'});
       clearInterval(iv);
     }
