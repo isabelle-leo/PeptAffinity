@@ -1886,7 +1886,7 @@ column(12, class = "col-lg-9 col-md-8",
                           
                           uiOutput("detailed_warn"),
                           
-                          div(class = "plot-container",
+                          div(
                               withSpinner(plotlyOutput("detailed_plot", height = "800px"), type = 4, color = "#667eea")
                           )
                       )
@@ -1948,8 +1948,7 @@ column(12, class = "col-lg-9 col-md-8",
       z-index:1000;
     ",
                                      # bootstrap spinner
-                                     div(class="spinner-border text-primary", role="status",
-                                         span(class="sr-only","Loading…")
+                                     div(class="spinner-border text-primary", role="status"
                                      )
                                    )
                                  ), type = 4)
