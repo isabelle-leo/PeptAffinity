@@ -1061,46 +1061,47 @@ clean_peptide_sequence <- function(peptide_seq) {
   gsub("\\+[0-9]+\\.[0-9]+", "", peptide_seq)
 }
 
-count_ptms <- function(peptide_seq) {
-  # Count occurrences of PTM pattern (+XX.XX)
-  all_mods <- regmatches(peptide_seq, gregexpr("\\+[0-9]+\\.[0-9]+", peptide_seq))
-  
-  # TMT masses to exclude (allowing for rounding variations)
-  # TMT/TMTpro: ~229.16, ~304.21
-  tmt_masses <- c(229.16, 229.163, 304.21, 304.207)
-  
-  # Count non-TMT modifications
-  sapply(all_mods, function(mods) {
-    if (length(mods) == 0) return(0)
-    
-    # Extract numeric values from modifications
-    mod_values <- as.numeric(gsub("\\+", "", mods))
-    
-    # Count modifications that aren't TMT (within 0.01 Da tolerance)
-    sum(!sapply(mod_values, function(x) {
-      any(abs(x - tmt_masses) < 0.01)
-    }))
-  })
-}
-
-count_phospho <- function(peptide_seq) {
-  # Extract all modifications
-  all_mods <- regmatches(peptide_seq, gregexpr("\\+[0-9]+\\.[0-9]+", peptide_seq))
-  
-  # Phosphorylation mass: ~79.966
-  phospho_mass <- 79.966
-  
-  # Count phosphorylations
-  sapply(all_mods, function(mods) {
-    if (length(mods) == 0) return(0)
-    
-    # Extract numeric values
-    mod_values <- as.numeric(gsub("\\+", "", mods))
-    
-    # Count mods that are phosphorylation (within 0.01 Da tolerance)
-    sum(abs(mod_values - phospho_mass) < 0.01)
-  })
-}
+#PTM related not needed
+# count_ptms <- function(peptide_seq) {
+#   # Count occurrences of PTM pattern (+XX.XX)
+#   all_mods <- regmatches(peptide_seq, gregexpr("\\+[0-9]+\\.[0-9]+", peptide_seq))
+#   
+#   # TMT masses to exclude (allowing for rounding variations)
+#   # TMT/TMTpro: ~229.16, ~304.21
+#   tmt_masses <- c(229.16, 229.163, 304.21, 304.207)
+#   
+#   # Count non-TMT modifications
+#   sapply(all_mods, function(mods) {
+#     if (length(mods) == 0) return(0)
+#     
+#     # Extract numeric values from modifications
+#     mod_values <- as.numeric(gsub("\\+", "", mods))
+#     
+#     # Count modifications that aren't TMT (within 0.01 Da tolerance)
+#     sum(!sapply(mod_values, function(x) {
+#       any(abs(x - tmt_masses) < 0.01)
+#     }))
+#   })
+# }
+# 
+# count_phospho <- function(peptide_seq) {
+#   # Extract all modifications
+#   all_mods <- regmatches(peptide_seq, gregexpr("\\+[0-9]+\\.[0-9]+", peptide_seq))
+#   
+#   # Phosphorylation mass: ~79.966
+#   phospho_mass <- 79.966
+#   
+#   # Count phosphorylations
+#   sapply(all_mods, function(mods) {
+#     if (length(mods) == 0) return(0)
+#     
+#     # Extract numeric values
+#     mod_values <- as.numeric(gsub("\\+", "", mods))
+#     
+#     # Count mods that are phosphorylation (within 0.01 Da tolerance)
+#     sum(abs(mod_values - phospho_mass) < 0.01)
+#   })
+# }
 
 #Google analytics server function
 ga_send <- function(client_id, name, params = list(), time = FALSE) {
@@ -1806,29 +1807,29 @@ ui <- fluidPage(
                          "n_samples_detected", "Samples with peptide",
                          min = 16, max = 88, value = c(16, 88), step = 1
                        ),
-                       
-                       sliderInput(
-                         "n_ptms", "Number of PTMs",
-                         min = 0, max = 5, value = c(0, 5), step = 1
-                       ),
-                       
-                       sliderInput(
-                         "n_phospho", "Phosphorylations",
-                         min = 0, max = 5, value = c(0, 5), step = 1
-                       ),
-                       
-                       # Add a toggle for phospho-only mode
-                       prettySwitch(
-                         inputId = "phospho_only",
-                         label = "Phospho-peptides only",
-                         value = FALSE,
-                         status = "success",
-                         slim = TRUE
-                       ),
+                       #PTM related not needed
+                       # sliderInput(
+                       #   "n_ptms", "Number of PTMs",
+                       #   min = 0, max = 5, value = c(0, 5), step = 1
+                       # ),
+                       # 
+                       # sliderInput(
+                       #   "n_phospho", "Phosphorylations",
+                       #   min = 0, max = 5, value = c(0, 5), step = 1
+                       # ),
+                       # 
+                       # # Add a toggle for phospho-only mode
+                       # prettySwitch(
+                       #   inputId = "phospho_only",
+                       #   label = "Phospho-peptides only",
+                       #   value = FALSE,
+                       #   status = "success",
+                       #   slim = TRUE
+                       # ),
                        div(
                          style = "background-color: #fff3cd; border: 1px solid #ffc107; padding: 8px; margin-bottom: 10px; border-radius: 5px; font-size: 0.85rem;",
                          icon("info-circle", style = "color: #856404;"),
-                         "These filters only affect Structure and Sequence plots."
+                         "These inputs only affect Structure and Sequence plots."
                        )
                      ),
 
@@ -2032,7 +2033,8 @@ server <- function(input, output, session) {
     c("corr_threshold", "corr_measure",
       "spread_threshold", "spread_measure",
       "n_peptides",      "n_isoforms",
-      "n_samples_detected", "n_ptms"),
+      "n_samples_detected"#, "n_ptms" #PTM related not needed
+      ),
     ~ track_input(.x, input, cid, send_value = FALSE))
   
   ## 3. help‑icon clicks ---------------------------------------------------
@@ -2115,9 +2117,10 @@ server <- function(input, output, session) {
     updateNumericInput(session, "n_peptides", value = 1)
     updateNumericInput(session, "n_isoforms", value = 1)
     updateSliderInput(session, "n_samples_detected", value = c(0, 100))
-    updateSliderInput(session, "n_ptms", value = c(0, 10))
-    updateSliderInput(session, "n_phospho", value = c(0, 5))
-    updatePrettySwitch(session, "phospho_only", value = FALSE)
+    #PTM related not needed
+    #updateSliderInput(session, "n_ptms", value = c(0, 10))
+    #updateSliderInput(session, "n_phospho", value = c(0, 5))
+    #updatePrettySwitch(session, "phospho_only", value = FALSE)
 
     
   })
@@ -2127,6 +2130,9 @@ server <- function(input, output, session) {
     fd <- filtered_data()
     if (is.null(fd) || nrow(fd) == 0) {
       return(tags$div("No results match the current filters.", class="text-danger"))
+      #clear plots if no result after filtering
+      output$NGL_plot <- NULL
+      output$detailed_plot <- NULL
     }
     choices <- unique(fd$gene_symbol)
     selectInput("selected_result", "Select ID:", choices = choices, selected = choices[1])
@@ -2185,7 +2191,9 @@ server <- function(input, output, session) {
                         input$selected_isoforms)
         )
       })
-      }else default_selected <- NULL
+      }else {default_selected <- NULL
+        return(tags$div("No results match the current filters.", class="text-danger"))
+      }
     
     selectInput("selected_isoforms", 
                 "Select Isoform(s):", 
@@ -2197,8 +2205,9 @@ server <- function(input, output, session) {
   working_plasma_dt <- reactive({
     req(input$selected_result)  # Must have a gene
     dt <- plasma_dt[Gene.Name == input$selected_result] # subset
-    dt[, PTM_count := count_ptms(Peptide.sequence)] # count PTMs
-    dt[, Phospho_count := count_phospho(Peptide.sequence)] #count phospho PTMs
+    #PTM related not needed
+    #dt[, PTM_count := count_ptms(Peptide.sequence)] # count PTMs
+    #dt[, Phospho_count := count_phospho(Peptide.sequence)] #count phospho PTMs
     # If isoforms are chosen, subset further
     if (!is.null(input$selected_isoforms) && length(input$selected_isoforms) > 0) {
       
@@ -2220,20 +2229,21 @@ server <- function(input, output, session) {
                  N <= input$n_samples_detected[2]]
     }
     
+    #PTM related not needed
     # PTM filter
-    if (!is.null(input$n_ptms)) {
-      dt <- dt[PTM_count >= input$n_ptms[1] & 
-                 PTM_count <= input$n_ptms[2]]
-    }
-    # + phospho too!
-    if (!is.null(input$n_phospho)) {
-      dt <- dt[Phospho_count >= input$n_phospho[1] & 
-                 Phospho_count <= input$n_phospho[2]]
-    }
-    # Phospho-only mode
-    if (!is.null(input$phospho_only) && input$phospho_only) {
-      dt <- dt[Phospho_count > 0]
-    }
+    # if (!is.null(input$n_ptms)) {
+    #   dt <- dt[PTM_count >= input$n_ptms[1] & 
+    #              PTM_count <= input$n_ptms[2]]
+    # }
+    # # + phospho too!
+    # if (!is.null(input$n_phospho)) {
+    #   dt <- dt[Phospho_count >= input$n_phospho[1] & 
+    #              Phospho_count <= input$n_phospho[2]]
+    # }
+    # # Phospho-only mode
+    # if (!is.null(input$phospho_only) && input$phospho_only) {
+    #   dt <- dt[Phospho_count > 0]
+    # }
     
     # Return a data.table
     dt
@@ -2264,26 +2274,6 @@ server <- function(input, output, session) {
   })
   
   #Plots -----
-  
-  output$summary_plot <- renderPlot({
-    fd <- filtered_data()
-    req(fd)
-    
-    ggplot(fd, aes(x = correlation, y = jenks_class, color = jenks_class)) +
-      geom_violin(alpha = 0.5) +
-      geom_jitter(height = 0.3, alpha = 0.7) +
-      scale_color_manual(values = categorical_colors) +
-      labs(x = "Peptide-Olink correlation", y = "Correlation category",
-           title = "Peptide-Olink correlations by category") +
-      theme_classic2() +
-      theme(legend.position = 'none',
-            text = element_text(size = 14, family = "Open Sans"),    
-            axis.title = element_text(size = 16),
-            axis.text = element_text(size = 13),
-            plot.title = element_text(size = 18)
-      )
-    
-  })
   
   output$volcano_plot <- renderPlotly({
     fd <-  gene_stats %>% filter(!is.na(sd_corr), gene_symbol %in% filtered_data()$gene_symbol)
