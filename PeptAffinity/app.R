@@ -1404,6 +1404,38 @@ ui <- fluidPage(
         background: white;
       }
       
+      /* Warning styling */
+      /* Warning and alert styling */
+.alert {
+  border-radius: 10px;
+  padding: 12px 20px;
+  margin-bottom: 15px;
+  animation: slideIn 0.3s ease-out;
+}
+
+.alert-warning {
+  background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+  border: 1px solid #ffc107;
+  color: #856404;
+}
+
+.alert-danger {
+  background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+  border: 1px solid #f5c6cb;
+  color: #721c24;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+      
       /* Radio buttons */
       .pretty-radio-buttons {
         display: flex;
@@ -2125,21 +2157,68 @@ server <- function(input, output, session) {
     
   })
   
+  # Warnings that are reactive
+  warning_state <- reactiveValues(
+    structure_warning = NULL,
+    sequence_warning = NULL,
+    last_valid_selection = NULL,
+    is_transitioning = FALSE
+  )
+  
+  working_plasma_dt_debounced <- reactive({
+    working_plasma_dt()
+  }) %>% debounce(500)
+  
+  observeEvent(input$selected_result, {
+    warning_state$is_transitioning <- TRUE
+    delay(500, warning_state$is_transitioning <- FALSE)
+  })
+  
   # UI for selecting results
   output$select_result_ui <- renderUI({
     fd <- filtered_data()
+    
     if (is.null(fd) || nrow(fd) == 0) {
-      return(tags$div("No results match the current filters.", class="text-danger"))
-      #clear plots if no result after filtering
-      output$NGL_plot <- NULL
-      output$detailed_plot <- NULL
+      # Clear the plots properly
+      output$NGL_plot <- renderNGLVieweR(NULL)
+      output$detailed_plot <- renderPlotly(NULL)
+      
+      return(tags$div(
+        class = "alert alert-danger",
+        icon("filter"),
+        "No proteins match the current filter criteria.",
+        br(),
+        actionButton("clear_filters_inline", "Clear Filters", 
+                     class = "btn-sm btn-warning mt-2")
+      ))
     }
+    
     choices <- unique(fd$gene_symbol)
-    selectInput("selected_result", "Select ID:", choices = choices, selected = choices[1])
+    
+    # Smart selection: try to keep current selection if still valid
+    current_selection <- isolate(input$selected_result)
+    if (!is.null(current_selection) && current_selection %in% choices) {
+      selected <- current_selection
+    } else if (!is.null(warning_state$last_valid_selection) && 
+               warning_state$last_valid_selection %in% choices) {
+      selected <- warning_state$last_valid_selection
+    } else {
+      selected <- choices[1]
+    }
+    
+    selectInput("selected_result", "Select ID:", 
+                choices = choices, 
+                selected = selected)
   })
   
-  observeEvent(input$selected_result, {
-    plasma_data <- plasma_dt[.(input$selected_result)] # Fast subset
+  # Add an observer to handle the inline warning related clear filters button:
+  observeEvent(input$clear_filters_inline, {
+    # Trigger the main clear filters action
+    updateNumericInput(session, "corr_threshold", value = c(-1,1))
+    updateNumericInput(session, "spread_threshold", value = c(0,1))
+    updateNumericInput(session, "n_peptides", value = 1)
+    updateNumericInput(session, "n_isoforms", value = 1)
+    updateSliderInput(session, "n_samples_detected", value = c(16, 88))
   })
   
   #Isoform -------
@@ -2353,7 +2432,29 @@ server <- function(input, output, session) {
   #   
   # } else {
   output$NGL_plot <- renderNGLVieweR({
-    need(ngl_plot_obj(), message = paste("No valid AlphaFold structure file returned for this ID of interest."))
+    req(input$selected_result, cancelOutput = TRUE)
+    req(input$selected_isoforms, cancelOutput = TRUE)
+    
+    # Check if selection is still valid
+    fd <- filtered_data()
+    req(fd, cancelOutput = TRUE)
+    req(input$selected_result %in% unique(fd$gene_symbol), cancelOutput = TRUE)
+    
+    # Check working data
+    dt <- working_plasma_dt()
+    req(dt, cancelOutput = TRUE)
+    req(nrow(dt) > 0, cancelOutput = TRUE)
+    
+    # Get the plot object
+    plot_obj <- ngl_plot_obj()
+    
+    # Only show message if we have valid selection but no structure
+    if (is.null(plot_obj)) {
+      validate(
+        need(FALSE, message = paste("No AlphaFold structure available for", 
+                                    input$selected_isoforms))
+      )
+    }
     
     observeEvent(input$ngl_loading, {
       if (isTRUE(input$ngl_loading)) {
@@ -2554,22 +2655,68 @@ tip.style.top  =  (y + 8) + 'px';
   
   
   output$alphafold_warn <- renderUI({
-    # Use validate to handle all the edge cases cleanly
-    validate(
-      need(input$selected_result, ""),  # Silent if no selection
-      need(working_plasma_dt(), ""),    # Silent if NULL
-      need(nrow(working_plasma_dt()) > 0, message = "No data matches filter conditions. Please adjust your filter settings.")
-    )
-    NULL  # If all validations pass, show nothing
+    # First check for a valid selection
+    req(input$selected_result, cancelOutput = TRUE)
+    
+    # Check if the current selection is still in filtered data
+    fd <- filtered_data()
+    if (!is.null(fd) && !(input$selected_result %in% unique(fd$gene_symbol))) {
+      # Selection is no longer valid, but don't show warning immediately
+      # as the UI will update soon
+      return(NULL)
+    }
+    
+    # Use the debounced version to avoid transition warnings
+    dt <- working_plasma_dt_debounced()
+    
+    # Only show warning if we have a stable state with no data
+    if (is.null(dt) || nrow(dt) == 0) {
+      # Check if this is due to peptide filters or protein filters
+      unfiltered_dt <- plasma_dt[Gene.Name == input$selected_result]
+      
+      if (nrow(unfiltered_dt) == 0) {
+        # This shouldn't happen if selection is valid
+        return(NULL)
+      } else {
+        # Data exists but filtered out by peptide filters
+        return(div(
+          class = "alert alert-warning",
+          icon("exclamation-triangle"),
+          "No peptides match the current filter conditions. Please adjust your peptide filter settings."
+        ))
+      }
+    }
+    
+    # If data exists, store this as last valid state
+    warning_state$last_valid_selection <- input$selected_result
+    return(NULL)
   })
   
   output$detailed_warn <- renderUI({
-    validate(
-      need(input$selected_result, ""),
-      need(working_plasma_dt(), ""),
-      need(nrow(working_plasma_dt()) > 0, message = "No data matches filter conditions. Please adjust your filter settings.")
-    )
-    NULL
+    req(input$selected_result, cancelOutput = TRUE)
+    
+    # Check if the current selection is still in filtered data
+    fd <- filtered_data()
+    if (!is.null(fd) && !(input$selected_result %in% unique(fd$gene_symbol))) {
+      return(NULL)  # Selection will update soon
+    }
+    
+    # Use the debounced version
+    dt <- working_plasma_dt_debounced()
+    
+    if (is.null(dt) || nrow(dt) == 0) {
+      unfiltered_dt <- plasma_dt[Gene.Name == input$selected_result]
+      
+      if (nrow(unfiltered_dt) > 0) {
+        return(div(
+          class = "alert alert-warning",
+          icon("exclamation-triangle"),
+          "No peptides match the current filter conditions. Please adjust your peptide filter settings."
+        ))
+      }
+    }
+    
+    return(NULL)
   })
   
   # Render the color scale only if the NGL plot is produced.
@@ -2581,10 +2728,19 @@ tip.style.top  =  (y + 8) + 'px';
   
   
   output$detailed_plot <- renderPlotly({
-    req(input$selected_result)
-    req(input$domain_source)
-    req(input$selected_isoforms)
-    req(nrow(working_plasma_dt()) > 0)
+    req(input$selected_result, cancelOutput = TRUE)
+    req(input$domain_source, cancelOutput = TRUE)
+    req(input$selected_isoforms, cancelOutput = TRUE)
+    
+    # Check if selection is still valid
+    fd <- filtered_data()
+    req(fd, cancelOutput = TRUE)
+    req(input$selected_result %in% unique(fd$gene_symbol), cancelOutput = TRUE)
+    
+    # Check working data
+    dt <- working_plasma_dt()
+    req(dt, cancelOutput = TRUE)
+    req(nrow(dt) > 0, cancelOutput = TRUE)
     # # Use a reactive expression for selected_plasma_data
     # selected_plasma <- plasma_dt[.(input$selected_result)]
     # 
