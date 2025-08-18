@@ -34,7 +34,7 @@ Protein Filters panel:
 
 Peptide Filters panel:
 
-* Samples with peptide: Adjust this range to show peptide correlations that fall within the defined sample detection criteria in the Sequence and Structure plots
+* Samples with peptide: Define sample detection criteria for peptides plotted (does not impact gene symbol filtering or summary statistics)
 
 Home tab:
 
