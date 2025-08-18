@@ -18,19 +18,23 @@ The app is organized by: setup section, functions section, app section. Constant
 
 **User guide**
 
-Filters panel:
+Protein Filters panel:
 
-* Peptide Correlation: Range of peptide‑Olink correlations (based on mean or median peptide correlation per protein)
+* Peptide Correlation: Range of peptide‑Olink correlations (based on the mean, median, or center values of peptide correlation per protein)
 
-* Peptide Correlation Spread: Range for the variance across samples (based on standard deviation - SD - or interquartile range - IQR)
+* Peptide Correlation Spread: Range for the variance across samples (based on standard deviation - SD, interquartile range - IQR, or range of peptide correlation per protein)
 
-* Peptides (≥): Minimum number of distinct peptides per gene ID
+* Number of Peptides (≥): Minimum number of distinct peptides per gene ID
 
-* Isoforms (≥): Minimum number of protein isoforms detected
+* Number of Isoforms (≥): Minimum number of protein isoforms detected
 
-* Click “Clear All” to reset filters to default values
+* Click “Clear All” to reset filters to include all valid peptide correlations
 * The filter panel updates values automatically
 * The tab retracts when you click again
+
+Peptide Filters panel:
+
+* Samples with peptide: Adjust this range to show peptide correlations that fall within the defined sample detection criteria in the Sequence and Structure plots
 
 Home tab:
 
