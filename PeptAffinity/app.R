@@ -2033,7 +2033,7 @@ column(12, class = "col-lg-9 col-md-8",
       href = paper_link,
       target = "_blank",
       onclick = "Shiny.setInputValue('went_paper','footer',{priority:'event'});",
-      "Read the PeptAffinity preprint"
+      "Read the PeptAffinity paper"
     ),
     p("© 2025 built by Isabelle Leo, Noora Sissala, and Haris Babačić", 
       style = "margin-top: 10px; color: #666; font-size: 0.9rem;")
@@ -2079,7 +2079,7 @@ server <- function(input, output, session) {
   track_input("select_result",  input, cid, send_value = FALSE)
   track_input("isoform_select", input, cid, send_value = FALSE)
   
-  ## 5. preprint link clicks ----------------------------------------------
+  ## 5. paper link clicks ----------------------------------------------
   track_input("went_paper",  input, cid,
               send_value = TRUE,
               event_name = "went_to_paper",
