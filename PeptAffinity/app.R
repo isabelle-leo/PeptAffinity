@@ -31,7 +31,7 @@ library(colorspace)
 #  ____) | |____   | |  | |__| | |     
 # |_____/|______|  |_|   \____/|_|     
 paper_link <- "https://dx.doi.org/10.21203/rs.3.rs-6501601/v1"
-#Sys.setenv(GA_API_SECRET = "12345", GA_MEASUREMENT_ID = "1234") #To fake the variables for testing
+Sys.setenv(GA_API_SECRET = "12345", GA_MEASUREMENT_ID = "1234") #To fake the variables for testing
 readRenviron("/home/project-vol/.Renviron") #server environment 
 
 font_add_google("Open Sans", "open-sans")  
@@ -160,27 +160,46 @@ get_color_vector <- function (colors,
   return(col_suppl)
 }
 
-get_alphafold_file <- function(ioi){
+get_alphafold_file <- function(ioi, use_local_backup = TRUE){ #NOTE if you are adjusting the app code, you need to create your own local pdb files or use the option to fetch from the database API, the files are not included in the app due to size concerns!
   # Build the AlphaFold URL directly using the isoform
+  local_pdb_dir <- "/home/project-vol/pdb"
   alphafold_path <- paste0(tempfile(), ".pdb")
-  url <- paste0("https://alphafold.ebi.ac.uk/files/AF-", ioi, "-F1-model_v4.pdb")
+  local_filename <- paste0("AF-", ioi, "-F1-model_v6.pdb")
+  local_path <- file.path(local_pdb_dir, local_filename)
+  url <- paste0("https://alphafold.ebi.ac.uk/files/AF-", ioi, "-F1-model_v6.pdb")
   
   alphafold_file <- curl_fetch_disk(url = url,
                                     handle = new_handle(),
                                     path = alphafold_path)
   
-  if (alphafold_file[["status_code"]] == 404) {
-    stop("No AlphaFold structure was found for the provided isoform.")
+  if (alphafold_file[["status_code"]] == 200) {
+    return(alphafold_file)
   }
   
-  return(alphafold_file)
+  if (use_local_backup && file.exists(local_path)) {
+    # Copy local file to temp location to match expected behavior
+    temp_path <- paste0(tempfile(), ".pdb")
+    file.copy(local_path, temp_path)
+    
+    # Return structure matching curl_fetch_disk format
+    return(list(
+      url = paste0("local://", local_path),
+      status_code = 200,
+      content = temp_path,
+      type = "application/octet-stream",
+      headers = list()
+    ))
+  }
+  
+  #if the other calls don't work
+  stop("No AlphaFold structure was found for the provided isoform.")
 }
 
-
+#Dead function but might be useful for fetching 
 get_FASTA_fromalphafold <- function(alphafold_file){
   # Extract the uniprot isoform id from the AlphaFold file URL
   uniprot_ioi <- gsub("https://alphafold.ebi.ac.uk/files/AF-", "", alphafold_file[["url"]])
-  uniprot_ioi <- gsub("-F1-model_v4.pdb", "", uniprot_ioi)
+  uniprot_ioi <- gsub("-F1-model_v6.pdb", "", uniprot_ioi)
   
   # Define temporary path and fetch the FASTA file from UniProt
   FASTA_path <- paste0(tempfile(), ".fasta")
@@ -1017,7 +1036,7 @@ alphafold_plot <- function(ioi, genesymb, uniprot_ids,
   p$x$surfaceCount <- expected_all - errors
   
   # Clean up temporary AlphaFold file and return the plot ( + bonus data for rendering)
-  unlink(ioi_alphafold[["content"]])
+  #unlink(ioi_alphafold[["content"]])
   return(p)
 }
 
@@ -1187,6 +1206,18 @@ track_input <- function(id,
 ui <- fluidPage(
   theme = my_theme,
   useShinyjs(),
+  tags$div(
+    id = "initial-loading-overlay",
+    tags$div(
+      class = "loading-content",
+      tags$div(class = "loading-title", "PeptAffinity"),
+      tags$div(class = "loading-spinner"),
+      tags$div(class = "loading-text", 
+               "Loading data",
+               tags$span(class = "loading-dots")
+      )
+    )
+  ),
   tags$head(
     tags$link(rel = "stylesheet", href = "https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&display=swap"),
     tags$link(rel = "icon", type = "image/png", href = "icon.png"),
@@ -1680,7 +1711,95 @@ ui <- fluidPage(
     padding: 15px;
   }
 }
-    "))
+    ")),
+    tags$style(HTML("
+    /* Initial loading overlay */
+    #initial-loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 99999;
+      transition: opacity 0.5s ease-out;
+    }
+    
+    #initial-loading-overlay.fade-out {
+      opacity: 0;
+      pointer-events: none;
+    }
+    
+    .loading-content {
+      text-align: center;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      padding: 40px 60px;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+    }
+    
+    .loading-title {
+      font-family: 'Chakra Petch', sans-serif;
+      font-size: 2.5rem;
+      font-weight: 550;
+      background: linear-gradient(135deg, #ff5c8d 0%, #ff876f 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 20px;
+    }
+    
+    .loading-spinner {
+      width: 50px;
+      height: 50px;
+      margin: 0 auto 20px;
+      border: 4px solid rgba(102, 126, 234, 0.1);
+      border-top: 4px solid #667eea;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .loading-text {
+      font-family: 'Open Sans', sans-serif;
+      color: #666;
+      font-size: 0.95rem;
+      margin-top: 10px;
+    }
+    
+    .loading-dots::after {
+      content: '';
+      animation: dots 1.5s steps(4, end) infinite;
+    }
+    
+    @keyframes dots {
+      0%, 20% { content: ''; }
+      40% { content: '.'; }
+      60% { content: '..'; }
+      80%, 100% { content: '...'; }
+    }
+  ")),
+    
+    # JavaScript to remove loading screen when Shiny is ready
+    tags$script(HTML("
+    $(document).on('shiny:sessioninitialized', function(event) {
+      setTimeout(function() {
+        $('#initial-loading-overlay').addClass('fade-out');
+        setTimeout(function() {
+          $('#initial-loading-overlay').remove();
+        }, 500);
+      }, 100);
+    });
+  "))
   ),
   
   # Animated header
@@ -2406,14 +2525,14 @@ server <- function(input, output, session) {
   ngl_plot_obj <- reactive({
     req(input$selected_result)
     req(input$selected_isoforms)
-    req(nrow(working_plasma_dt()) > 0)
+    req(nrow(working_plasma_dt_debounced()) > 0)
     
     result <- try(
       alphafold_plot(
         ioi = input$selected_isoforms, 
         genesymb = input$selected_result, 
-        uniprot_ids = working_plasma_dt(),
-        working_dt = working_plasma_dt(),
+        uniprot_ids = working_plasma_dt_debounced(),
+        working_dt = working_plasma_dt_debounced(),
         fasta_file = NULL, 
         correlation_palette = correlation_palette
       ),
@@ -2456,190 +2575,160 @@ server <- function(input, output, session) {
       )
     }
     
-    observeEvent(input$ngl_loading, {
-      if (isTRUE(input$ngl_loading)) {
-        shinyjs::disable("n_samples_detected")
-        shinyjs::runjs("
-      $('#peptide_filters_dropdown_btn').addClass('disabled');
-      $('.sw-dropdown-content').css('pointer-events', 'none');
-    ")
-      } else {
-        shinyjs::enable("n_samples_detected")
-        shinyjs::runjs("
-      $('#peptide_filters_dropdown_btn').removeClass('disabled');
-      $('.sw-dropdown-content').css('pointer-events', 'auto');
-    ")
-      }
-    })
     
     htmlwidgets::onRender(
       x = ngl_plot_obj(),
       jsCode = "function(el, x) {
-      // Troubleshooting helpers below
-      var stage = this.getStage();
-      if (!stage) {
-console.error('No NGL Stage found via this.getStage()');
-return;
-} 
-  console.log('🏗  NGL Stage loaded:', stage);
+  var stage = this.getStage();
+  if (!stage) {
+    console.error('No NGL Stage found');
+    return;
+  }
 
-  // 1) List every signal name
-  console.log('🔔 Available signals:', Object.keys(stage.signals));
-
-  // 2) Attach a one‑size‑fits‑all logger
-  Object.entries(stage.signals).forEach(function([name, sig]) {
-    if (sig && typeof sig.add === 'function') {
-      sig.add(function() {
-        console.log('📣 Signal fired:', name);
-      });
+  // Mobile check
+  $(document).ready(function() {
+    function checkScreenSize() {
+      var isSmallScreen = window.innerWidth < 768;
+      Shiny.setInputValue('is_small_screen', isSmallScreen);
+      if (isSmallScreen) {
+        $('#mobile-structure-warning').show();
+      } else {
+        $('#mobile-structure-warning').hide();
+      }
     }
+    checkScreenSize();
+    $(window).resize(checkScreenSize);
   });
 
-  // 3) Dump component(s) and their reprList
-  var compList = stage.compList;
-  console.log('🧩 Components:', compList);
-  compList.forEach(function(comp, ci) {
-    console.log('  ↳ Component', ci, 'methods:', Object.keys(comp));
-    console.log('     reprList:', comp.reprList);
-    comp.reprList.forEach(function(rep, ri) {
-      console.log('     ↳ repr[' + ri + ']:', rep, 'prototype:', Object.getPrototypeOf(rep));
-    });
-  });
-  
-// Mobile related: check screen size
-$(document).ready(function() {
-  function checkScreenSize() {
-    var isSmallScreen = window.innerWidth < 768; // Bootstrap's md breakpoint
-    Shiny.setInputValue('is_small_screen', isSmallScreen);
-    
-    if (isSmallScreen) {
-      $('#mobile-structure-warning').show();
-    } else {
-      $('#mobile-structure-warning').hide();
-    }
+  // Get UI elements
+  var spinner = el.parentNode.querySelector('#ngl-loading');
+  var peptideOverlay = document.getElementById('peptide-dropdown-overlay');
+  var peptideBtn = document.querySelector('[data-id=\"peptide_filters_dropdown_btn\"]');
+  var proteinOverlay = document.getElementById('protein-dropdown-overlay');
+  var proteinBtn = document.querySelector('[data-id=\"filters_dropdown_btn\"]');
+
+  // Show loading UI
+  if (spinner) spinner.style.display = 'flex';
+  if (peptideOverlay) peptideOverlay.style.display = 'flex';
+  if (peptideBtn) {
+    peptideBtn.style.opacity = '0.5';
+    peptideBtn.style.pointerEvents = 'none';
+  }
+  if (proteinOverlay) proteinOverlay.style.display = 'flex';
+  if (proteinBtn) {
+    proteinBtn.style.opacity = '0.5';
+    proteinBtn.style.pointerEvents = 'none';
+  }
+
+  // CRITICAL: Clean up ALL old intervals on this element
+  if (el.loadingInterval) {
+    clearInterval(el.loadingInterval);
+    el.loadingInterval = null;
   }
   
-  // Check on load
-  checkScreenSize();
+  // Also clear any orphaned intervals stored globally
+  if (window.nglLoadingInterval) {
+    clearInterval(window.nglLoadingInterval);
+    window.nglLoadingInterval = null;
+  }
+
+  // Create completion handler function
+  function hideLoadingUI() {
+    if (spinner) spinner.style.display = 'none';
+    if (peptideOverlay) peptideOverlay.style.display = 'none';
+    if (peptideBtn) {
+      peptideBtn.style.opacity = '1';
+      peptideBtn.style.pointerEvents = 'auto';
+    }
+    if (proteinOverlay) proteinOverlay.style.display = 'none';
+    if (proteinBtn) {
+      proteinBtn.style.opacity = '1';
+      proteinBtn.style.pointerEvents = 'auto';
+    }
+  }
+
+  // Single interval to check completion
+  var checkCount = 0;
+  var maxChecks = 10; // 10 seconds max (100 * 100ms)
   
-  // Check on resize
-  $(window).resize(function() {
-    checkScreenSize();
-  });
-});
-
-// Call to the overlay spinner
-var spinner = el.parentNode.querySelector('#ngl-loading');
-var peptideOverlay = document.getElementById('peptide-dropdown-overlay');
-var peptideBtn = document.querySelector('[data-id=\"peptide_filters_dropdown_btn\"]');
-var proteinOverlay = document.getElementById('protein-dropdown-overlay');
-var proteinBtn = document.querySelector('[data-id=\"filters_dropdown_btn\"]');
-
-if (spinner) spinner.style.display = 'flex';
-if (peptideOverlay) peptideOverlay.style.display = 'flex';
-if (peptideBtn) {
-  peptideBtn.style.opacity = '0.5';
-  peptideBtn.style.pointerEvents = 'none';
-}
-
-if (proteinOverlay) proteinOverlay.style.display = 'flex';
-if (proteinBtn) {
-  proteinBtn.style.opacity = '0.5';
-  proteinBtn.style.pointerEvents = 'none';
-}
-
-// Disable the slider using Shiny
-Shiny.setInputValue('ngl_loading', true, {priority: 'event'});
-
-  // The part that looks for surfaces to be rendered
-  var stage = this.getStage();
-if(stage) {
-  var iv = setInterval(function() {
+  el.loadingInterval = setInterval(function() {
+    checkCount++;
+    
+    // Timeout after 10 seconds
+    if (checkCount > maxChecks) {
+      console.warn('NGL loading timeout - forcing cleanup');
+      hideLoadingUI();
+      clearInterval(el.loadingInterval);
+      el.loadingInterval = null;
+      return;
+    }
+    
+    // Check if stage still exists
+    if (!stage || !stage.tasks) {
+      console.warn('Stage lost - cleaning up');
+      hideLoadingUI();
+      clearInterval(el.loadingInterval);
+      el.loadingInterval = null;
+      return;
+    }
+    
+    // Normal completion
     if (stage.tasks.count === 0) {
-      if (spinner) spinner.style.display = 'none';
-      if (peptideOverlay) peptideOverlay.style.display = 'none';
-      if (peptideBtn) {
-        peptideBtn.style.opacity = '1';
-        peptideBtn.style.pointerEvents = 'auto';
-      }
-      if (proteinOverlay) proteinOverlay.style.display = 'none';
-if (proteinBtn) {
-  proteinBtn.style.opacity = '1';
-  proteinBtn.style.pointerEvents = 'auto';
-}
-      Shiny.setInputValue('ngl_loading', false, {priority: 'event'});
-      clearInterval(iv);
+      hideLoadingUI();
+      clearInterval(el.loadingInterval);
+      el.loadingInterval = null;
     }
   }, 100);
-} else {
-  if (spinner) spinner.style.display = 'none';
-  if (peptideOverlay) peptideOverlay.style.display = 'none';
-  if (peptideBtn) {
-    peptideBtn.style.opacity = '1';
-    peptideBtn.style.pointerEvents = 'auto';
-  }
-  Shiny.setInputValue('ngl_loading', false, {priority: 'event'});
-}
   
-    // Turn off the built-in tooltip
-    stage.setParameters({tooltip: false});
+  // Store globally as backup
+  window.nglLoadingInterval = el.loadingInterval;
 
-    // Create a custom tooltip
-    if(!stage.viewer.container.myTooltip){
-      let tip = document.createElement('div');
-      Object.assign(tip.style, {
-        display: 'none',
-        position: 'absolute',
-        zIndex: 9999,
-        pointerEvents: 'none',
-        backgroundColor: 'rgba(0,0,0,0.6)',
-        color: 'lightgrey',
-        padding: '0.5em',
-        fontFamily: 'sans-serif'
-      });
-      stage.viewer.container.appendChild(tip);
-      stage.viewer.container.myTooltip = tip;
-    }
-    let tip = stage.viewer.container.myTooltip;
+  // Custom tooltip setup
+  stage.setParameters({tooltip: false});
 
-    // Retrieve an array of median correlations
-    let corrData = x.corrData || [];
-
-    // Hook a 'hovered' signal to show the residue number + correlation
-    stage.signals.hovered.add(function (pickingProxy) {
-const tip = stage.viewer.container.myTooltip;
-if (!pickingProxy || !pickingProxy.atom) {
-tip.style.display = 'none';
-return;
-}
-let atom = pickingProxy.atom;
-let cp = pickingProxy.canvasPosition;
-
-// residue mapping is 0-based, so use resno - 1:
-let residueIndex = atom.resno - 1;
-let corrVal = corrData[residueIndex];
-
-// Build the label
-let label = atom.qualifiedName();
-if (typeof corrVal === 'number' && isFinite(corrVal)) {
-label += ', Median correlation: ' + corrVal.toFixed(3);
-}
-
-tip.innerHTML  = label;
-tip.style.display = 'block';
-
-// Needs an adjustment because relative to the container/pageg y is reversed
-const container = stage.viewer.container;
-if (getComputedStyle(container).position === 'static') {
-  container.style.position = 'relative';   // becomes the “nearest positioned ancestor”
-}
-
-const y = container.clientHeight - cp.y;   // flip Y
-tip.style.left =  (cp.x + 8) + 'px';
-tip.style.top  =  (y + 8) + 'px';
-});
+  if (!stage.viewer.container.myTooltip) {
+    let tip = document.createElement('div');
+    Object.assign(tip.style, {
+      display: 'none',
+      position: 'absolute',
+      zIndex: 9999,
+      pointerEvents: 'none',
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      color: 'lightgrey',
+      padding: '0.5em',
+      fontFamily: 'sans-serif'
+    });
+    stage.viewer.container.appendChild(tip);
+    stage.viewer.container.myTooltip = tip;
   }
-  "
+  
+  let tip = stage.viewer.container.myTooltip;
+  let corrData = x.corrData || [];
+
+  stage.signals.hovered.add(function (pickingProxy) {
+    if (!pickingProxy || !pickingProxy.atom) {
+      tip.style.display = 'none';
+      return;
+    }
+    let atom = pickingProxy.atom;
+    let cp = pickingProxy.canvasPosition;
+    let residueIndex = atom.resno - 1;
+    let corrVal = corrData[residueIndex];
+    let label = atom.qualifiedName();
+    if (typeof corrVal === 'number' && isFinite(corrVal)) {
+      label += ', Median correlation: ' + corrVal.toFixed(3);
+    }
+    tip.innerHTML = label;
+    tip.style.display = 'block';
+    const container = stage.viewer.container;
+    if (getComputedStyle(container).position === 'static') {
+      container.style.position = 'relative';
+    }
+    const y = container.clientHeight - cp.y;
+    tip.style.left = (cp.x + 8) + 'px';
+    tip.style.top = (y + 8) + 'px';
+  });
+}"
     )
   })
   #    } #end else 
