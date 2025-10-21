@@ -2644,38 +2644,51 @@ server <- function(input, output, session) {
     }
   }
 
-  // Single interval to check completion
-  var checkCount = 0;
-  var maxChecks = 10; // 10 seconds max (100 * 100ms)
+// Single interval to check completion
+var checkCount = 0;
+var maxChecks = 100;
+
+el.loadingInterval = setInterval(function() {
+  checkCount++;
   
-  el.loadingInterval = setInterval(function() {
-    checkCount++;
+  // Timeout
+  if (checkCount > maxChecks) {
+    console.warn('NGL loading timeout after', checkCount * 100, 'ms');
+    hideLoadingUI();
+    clearInterval(el.loadingInterval);
+    el.loadingInterval = null;
+    return;
+  }
+  
+  // Check if stage still exists
+  if (!stage || !stage.tasks) {
+    console.warn('Stage lost - cleaning up');
+    hideLoadingUI();
+    clearInterval(el.loadingInterval);
+    el.loadingInterval = null;
+    return;
+  }
+  
+  // Wait for tasks to be 0 for TWO consecutive checks
+  if (stage.tasks.count === 0) {
+    if (typeof el.tasksZeroCount === 'undefined') {
+      el.tasksZeroCount = 1;
+    } else {
+      el.tasksZeroCount++;
+    }
     
-    // Timeout after 10 seconds
-    if (checkCount > maxChecks) {
-      console.warn('NGL loading timeout - forcing cleanup');
+    // Only hide after 2 consecutive zero-task checks (200ms buffer)
+    if (el.tasksZeroCount >= 2) {
       hideLoadingUI();
       clearInterval(el.loadingInterval);
       el.loadingInterval = null;
-      return;
+      delete el.tasksZeroCount;
     }
-    
-    // Check if stage still exists
-    if (!stage || !stage.tasks) {
-      console.warn('Stage lost - cleaning up');
-      hideLoadingUI();
-      clearInterval(el.loadingInterval);
-      el.loadingInterval = null;
-      return;
-    }
-    
-    // Normal completion
-    if (stage.tasks.count === 0) {
-      hideLoadingUI();
-      clearInterval(el.loadingInterval);
-      el.loadingInterval = null;
-    }
-  }, 100);
+  } else {
+    // Reset counter if tasks are non-zero
+    el.tasksZeroCount = 0;
+  }
+}, 100);
   
   // Store globally as backup
   window.nglLoadingInterval = el.loadingInterval;
