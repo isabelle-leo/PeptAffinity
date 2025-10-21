@@ -2263,11 +2263,11 @@ server <- function(input, output, session) {
     # Reset thresholds
     # Goal: Show everything
     # Does not change any radio buttons
-    updateNumericInput(session, "corr_threshold", value = c(-1,1))
-    updateNumericInput(session, "spread_threshold", value = c(0,1))
+    updateSliderInput(session, "corr_threshold", value = c(-1,1))
+    updateSliderInput(session, "spread_threshold", value = c(0,1))
     updateNumericInput(session, "n_peptides", value = 1)
     updateNumericInput(session, "n_isoforms", value = 1)
-    updateSliderInput(session, "n_samples_detected", value = c(0, 100))
+    updateSliderInput(session, "n_samples_detected", value = c(16, 88))
     #PTM related not needed
     #updateSliderInput(session, "n_ptms", value = c(0, 10))
     #updateSliderInput(session, "n_phospho", value = c(0, 5))
@@ -2298,9 +2298,6 @@ server <- function(input, output, session) {
     fd <- filtered_data()
     
     if (is.null(fd) || nrow(fd) == 0) {
-      # Clear the plots properly
-      output$NGL_plot <- renderNGLVieweR(NULL)
-      output$detailed_plot <- renderPlotly(NULL)
       
       return(tags$div(
         class = "alert alert-danger",
@@ -2333,8 +2330,8 @@ server <- function(input, output, session) {
   # Add an observer to handle the inline warning related clear filters button:
   observeEvent(input$clear_filters_inline, {
     # Trigger the main clear filters action
-    updateNumericInput(session, "corr_threshold", value = c(-1,1))
-    updateNumericInput(session, "spread_threshold", value = c(0,1))
+    updateSliderInput(session, "corr_threshold", value = c(-1,1))
+    updateSliderInput(session, "spread_threshold", value = c(0,1))
     updateNumericInput(session, "n_peptides", value = 1)
     updateNumericInput(session, "n_isoforms", value = 1)
     updateSliderInput(session, "n_samples_detected", value = c(16, 88))
